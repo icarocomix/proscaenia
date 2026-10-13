@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Palcoscenico stilizzato: mantovana in alto, due tende laterali e un triangolo "play" dorato. -->
+    <path android:fillColor="#FFB8283C" android:pathData="M28,30h52v8c-6,4 -12,4 -18,0c-6,4 -12,4 -16,0c-6,4 -12,4 -18,0z" />
+    <path android:fillColor="#FF8E1B2B" android:pathData="M28,36c4,10 6,24 4,42h-4z" />
+    <path android:fillColor="#FF8E1B2B" android:pathData="M80,36c-4,10 -6,24 -4,42h4z" />
+    <path android:fillColor="#FFD9B26F" android:pathData="M47,50l16,9l-16,9z" />
+</vector>

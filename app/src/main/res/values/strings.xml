@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Proscaenia</string>
+
+    <!-- Login di primo avvio -->
+    <string name="login_title">Accedi a Proscaenia</string>
+    <string name="login_subtitle">Inserisci i dati del tuo abbonamento. Vengono verificati con la piattaforma e salvati cifrati su questo dispositivo: non ti verranno più richiesti.</string>
+    <string name="login_username">Username</string>
+    <string name="login_password">Password</string>
+    <string name="login_show_password">Mostra password</string>
+    <string name="login_hide_password">Nascondi password</string>
+    <string name="login_submit">Accedi</string>
+
+    <!-- Catalogo e dettaglio -->
+    <string name="catalog_title">Proscaenia</string>
+    <string name="catalog_empty">Il catalogo non contiene ancora spettacoli.</string>
+    <string name="detail_play">Riproduci</string>
+    <string name="detail_resume">Riprendi da %1$s</string>
+    <string name="duration_hours_minutes">%1$d h %2$d min</string>
+    <string name="duration_minutes">%1$d min</string>
+
+    <!-- Azioni comuni -->
+    <string name="action_back">Indietro</string>
+    <string name="action_retry">Riprova</string>
+    <string name="action_close">Chiudi</string>
+
+    <!-- Player -->
+    <string name="player_subtitles_enable">Attiva sottotitoli</string>
+    <string name="player_subtitles_disable">Disattiva sottotitoli</string>
+    <string name="player_voice_boost_enable">Attiva Amplifica voce</string>
+    <string name="player_voice_boost_disable">Disattiva Amplifica voce</string>
+    <string name="player_voice_boost_on">Amplifica voce attivo</string>
+    <string name="player_voice_boost_off">Amplifica voce disattivato</string>
+    <string name="player_speed">Velocità di riproduzione</string>
+    <string name="player_speed_reset">Torna a 1x</string>
+    <string name="player_speed_cast_cap">Sul Chromecast la velocità è limitata a 2x: la tua scelta tornerà attiva sul telefono.</string>
+    <string name="player_casting_title">In riproduzione su %1$s</string>
+    <string name="player_casting_default_device">Chromecast</string>
+    <string name="player_casting_body">La riproduzione è gestita dal Chromecast: usa i controlli qui sotto, la notifica o il telecomando della TV. Amplifica voce si applica solo all\'audio del telefono.</string>
+
+    <!-- Errori -->
+    <string name="error_network">Connessione assente o instabile. Controlla la rete e riprova.</string>
+    <string name="error_invalid_credentials">La piattaforma ha rifiutato username e password.</string>
+    <string name="error_auto_sign_in_rejected">La piattaforma non ha accettato l\'accesso automatico. L\'app riproverà da sola; puoi anche toccare Riprova.</string>
+    <string name="error_inactive_subscription">Il tuo abbonamento non risulta attivo. Verifica lo stato dal sito di Proscaenia.</string>
+    <string name="error_missing_credentials">Non ci sono credenziali salvate su questo dispositivo.</string>
+    <string name="error_server">Il servizio ha risposto con un errore (HTTP %1$d).</string>
+    <string name="error_not_found">Contenuto non trovato sulla piattaforma.</string>
+    <string name="error_malformed">La risposta della piattaforma non è nel formato atteso.</string>
+    <string name="error_unknown">Si è verificato un errore imprevisto.</string>
+    <string name="error_playback_link">Il collegamento al video è scaduto o non è più valido e non è stato possibile rigenerarlo.</string>
+    <string name="error_playback_network">La connessione si è interrotta durante la riproduzione.</string>
+    <string name="error_playback_format">Il formato del video non è supportato da questo dispositivo.</string>
+    <string name="error_device_limit">Il tuo account ha raggiunto il numero massimo di dispositivi. Rimuovi un dispositivo che non usi più dall\'area personale del sito Proscaenia e riprova.</string>
+    <string name="error_playback_drm">Impossibile ottenere la licenza di protezione del video. Riprova; se il problema persiste, invia il file di log.</string>
+    <string name="error_playback_generic">Errore di riproduzione (%1$s).</string>
+</resources>

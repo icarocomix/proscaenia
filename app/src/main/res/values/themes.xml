@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema AppCompat scuro come base dell'activity: serve al MediaRouteButton del Cast (richiede
+         un tema AppCompat opaco) e dà lo sfondo corretto prima che Compose disegni il primo frame. -->
+    <style name="Theme.Proscaenia" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">@color/curtain_red</item>
+        <item name="colorPrimaryDark">@color/curtain_red_dark</item>
+        <item name="colorAccent">@color/footlight_gold</item>
+        <item name="android:windowBackground">@color/stage_black</item>
+    </style>
+</resources>
