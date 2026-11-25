@@ -76,3 +76,21 @@ Stato di avanzamento: riprendere dal primo punto non spuntato.
 - [x] 40. (testato dall utente sulla TV; APK pronto: dist/proscaenia-tv-prova-debug.apk, LEANBACK_LAUNCHER + banner + log DeviceCapabilities; ADB TV "unauthorized", installazione manuale) Prova app su TV "Smart TV Pro" (Cast integrato, 192.168.1.61): ADB in rete, installazione APK debug, livello Widevine, login, riproduzione, diagnostica
 - [ ] 41. Decisione: app Android TV (UI telecomando + pre-scaricamento cifrato) vs server locale per Chromecast
 - [x] 42. Build release minificata 1.0.0.22 (4,7 MB, 23 test OK) + avvio verificato sul Pixel 7
+
+## Prova tecnica Samsung Tizen (UE43RU7400, Tizen 5.0) — cartella `tizen/`
+
+- [x] 43. Raccolta contratto (API, header, licenze Widevine/PlayReady dal client web: `drm.proscaenia.com?drm-type=…`)
+- [x] 44. Shaka Player 4.16.58 (Apache-2.0) incluso localmente in `tizen/lib/`
+- [x] 45. Scheletro app web Tizen: `config.xml`, `index.html`, CSS, navigazione da telecomando
+- [x] 46. Diagnostica: ambiente, EME (Widevine/PlayReady), CORS su catalogo, login, scheda, licenza
+- [x] 47. Riproduzione: Shaka (EME) Widevine/PlayReady + AVPlay nativo con licenza gestita in JS
+- [x] 48. Rilascio posto dispositivo all'uscita; log a schermo + invio opzionale al PC (`tools/tizen_log_receiver.py`)
+- [x] 48b. Esportazione log: ZIP (JSZip 3.10.1, MIT) su USB/Download della TV, invio dello ZIP al PC, condivisione nativa se presente (assente su Tizen 5.0)
+- [x] 49. Script di pacchetto/installazione (`tizen/build-wgt.sh`) e guida `tizen/README.md`
+- [x] 50. Verifica sintassi JS + documento `docs/prova-tecnica-tizen.md`
+- [ ] 51. Esecuzione sulla TV (a cura dell'utente) e lettura del log
+      - [x] 51a. Installazione Tizen Studio 6.1 CLI in ~/tizen-studio (installer in ~/Scaricati/tizen-installer)
+      - [x] 51b. Package Manager: TV Extensions + Samsung Certificate Extension
+      - [x] 51c. Certificato autore + profilo di firma `proscaenia`
+      - [ ] 51d. Developer Mode sulla TV (utente) e `sdb connect`
+      - [ ] 51e. Pacchetto, installazione e avvio (`build-wgt.sh --tv`)

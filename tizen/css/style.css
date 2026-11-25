@@ -1,0 +1,109 @@
+/* Layout fisso 1920x1080: la TV non ridimensiona la finestra, quindi niente media query. */
+:root {
+    --bg: #14100f;
+    --panel: #221a18;
+    --text: #f1e9e4;
+    --muted: #a89a92;
+    --accent: #c9a227;
+    --danger: #b3412f;
+}
+
+html, body {
+    margin: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "SamsungOne", "Tizen Sans", sans-serif;
+    font-size: 22px;
+}
+
+/* Durante la riproduzione con AVPlay il video sta sotto la pagina: tutto deve diventare trasparente. */
+body.playing-avplay, body.playing-avplay #ui { background: transparent; }
+body.playing #ui { display: none; }
+
+#av-player, #video {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    display: none;
+}
+body.playing-avplay #av-player { display: block; }
+body.playing-shaka #video { display: block; background: #000; }
+
+#ui {
+    display: flex;
+    height: 1080px;
+    background: var(--bg);
+}
+
+#panel {
+    width: 760px;
+    padding: 24px 32px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    background: var(--panel);
+}
+
+#log-panel {
+    flex: 1;
+    padding: 24px;
+    overflow: hidden;
+}
+
+#log {
+    margin: 0;
+    height: 1032px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: monospace;
+    font-size: 17px;
+    line-height: 1.35;
+}
+#log .w { color: #e8b04a; }
+#log .e { color: #ff7a66; }
+
+h1 { font-size: 30px; margin: 0 0 8px; color: var(--accent); }
+h2 { font-size: 20px; margin: 18px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+.status { margin: 0; color: var(--muted); }
+.hint { margin: 6px 0 0; color: var(--muted); font-size: 18px; }
+/* Niente "gap" sui flex: Chromium 63 (Tizen 5.0) non lo supporta. */
+.row { display: flex; }
+.row .focusable { flex: 1; }
+.row .focusable + .focusable { margin-left: 10px; }
+
+.focusable {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 6px 0;
+    padding: 10px 14px;
+    font-size: 20px;
+    color: var(--text);
+    background: #3a2e2a;
+    border: 3px solid transparent;
+    border-radius: 8px;
+    text-align: left;
+}
+.focusable:focus { outline: none; border-color: var(--accent); background: #4d3c36; }
+.focusable.danger { background: #5a2a22; }
+.focusable.selected { border-left: 10px solid var(--accent); }
+
+#show-list { max-height: 260px; overflow-y: auto; }
+
+#osd {
+    position: absolute;
+    left: 40px;
+    bottom: 40px;
+    padding: 12px 18px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    font-size: 22px;
+    z-index: 10;
+}
+.hidden { display: none; }

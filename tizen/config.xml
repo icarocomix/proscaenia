@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Prova tecnica Proscaenia per Samsung Smart TV (Tizen 5.0, UE43RU7400).
+  App web impacchettata (.wgt): non sostituisce né modifica l'app Android, serve solo a verificare
+  sulla TV reale CORS, login, licenze DRM e riproduzione prima di scrivere un client completo.
+-->
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets"
+        id="http://icarocomix.com/proscaenia-tizen-prova" version="0.1.0" viewmodes="maximized">
+    <tizen:application id="PrScTizen0.ProscaeniaProva" package="PrScTizen0" required_version="2.3"/>
+    <tizen:profile name="tv-samsung"/>
+    <content src="index.html"/>
+    <icon src="icon.png"/>
+    <name>Proscaenia Prova</name>
+    <description>Prova tecnica: CORS, login, DRM Widevine/PlayReady, riproduzione DASH.</description>
+
+    <feature name="http://tizen.org/feature/screen.size.all"/>
+
+    <!-- Accesso di rete verso qualunque origine: API, CDN video, server licenze e ricevitore log sul PC. -->
+    <access origin="*" subdomains="true"/>
+
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+    <tizen:privilege name="http://tizen.org/privilege/filesystem.read"/>
+    <tizen:privilege name="http://tizen.org/privilege/filesystem.write"/>
+    <tizen:privilege name="http://tizen.org/privilege/externalstorage"/>
+    <tizen:privilege name="http://tizen.org/privilege/mediastorage"/>
+    <tizen:privilege name="http://developer.samsung.com/privilege/avplay"/>
+    <tizen:privilege name="http://developer.samsung.com/privilege/drmplay"/>
+    <tizen:privilege name="http://developer.samsung.com/privilege/productinfo"/>
+
+    <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="disable"
+                   encryption="disable" install-location="auto" hwkey-event="enable"/>
+</widget>

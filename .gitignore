@@ -7,3 +7,8 @@ local.properties
 captures/
 dist/
 probe-output/
+
+# Prova Tizen: pacchetti generati e log ricevuti dalla TV
+tizen/*.wgt
+tizen/.buildResult/
+tizen-log/

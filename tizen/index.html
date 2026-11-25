@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080, user-scalable=no">
+    <title>Proscaenia Prova</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- API Samsung (AVPlay, ProductInfo): il runtime della TV risolve $WEBAPIS; altrove il caricamento fallisce senza conseguenze. -->
+    <script src="$WEBAPIS/webapis/webapis.js"></script>
+</head>
+<body>
+    <!-- Piano video nativo di AVPlay: viene disegnato sotto l'HTML, quindi durante la riproduzione rendo trasparente la pagina. -->
+    <object id="av-player" type="application/avplayer"></object>
+    <!-- Elemento video usato da Shaka Player (EME/MSE). -->
+    <video id="video" playsinline></video>
+
+    <div id="ui">
+        <section id="panel">
+            <h1>Proscaenia · prova Tizen</h1>
+            <p id="status" class="status">Pronto</p>
+
+            <h2>1. Diagnostica</h2>
+            <button class="focusable" data-action="env">Ambiente ed EME</button>
+            <button class="focusable" data-action="cors">Test API (CORS)</button>
+
+            <h2>2. Accesso</h2>
+            <input class="focusable" id="email" type="email" placeholder="Email" autocomplete="off">
+            <input class="focusable" id="password" type="password" placeholder="Password" autocomplete="off">
+            <button class="focusable" data-action="login">Accedi</button>
+
+            <h2>3. Spettacolo</h2>
+            <button class="focusable" data-action="shows">Carica spettacoli</button>
+            <div id="show-list"></div>
+            <p id="selected-show" class="hint">Nessuno spettacolo selezionato</p>
+
+            <h2>4. Riproduzione</h2>
+            <div class="row">
+                <button class="focusable" data-action="play" data-engine="shaka" data-drm="widevine">Shaka · Widevine</button>
+                <button class="focusable" data-action="play" data-engine="shaka" data-drm="playready">Shaka · PlayReady</button>
+            </div>
+            <div class="row">
+                <button class="focusable" data-action="play" data-engine="avplay" data-drm="playready">AVPlay · PlayReady</button>
+                <button class="focusable" data-action="play" data-engine="avplay" data-drm="widevine">AVPlay · Widevine</button>
+            </div>
+
+            <h2>5. Log</h2>
+            <input class="focusable" id="log-server" type="text" placeholder="Ricevitore PC, es. http://192.168.1.10:8765" autocomplete="off">
+            <button class="focusable" data-action="log-server">Attiva invio al PC</button>
+            <div class="row">
+                <button class="focusable" data-action="export-usb">Esporta ZIP (USB)</button>
+                <button class="focusable" data-action="export-pc">Invia ZIP al PC</button>
+            </div>
+            <button class="focusable" data-action="export-share">Condividi ZIP</button>
+
+            <h2>6. Uscita</h2>
+            <button class="focusable danger" data-action="release">Libera posto dispositivo ed esci</button>
+        </section>
+        <section id="log-panel">
+            <pre id="log"></pre>
+        </section>
+    </div>
+
+    <div id="osd" class="hidden"></div>
+
+    <script src="lib/shaka-player.compiled.js"></script>
+    <script src="lib/jszip.min.js"></script>
+    <script src="js/log.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/diagnostics.js"></script>
+    <script src="js/player-shaka.js"></script>
+    <script src="js/player-avplay.js"></script>
+    <script src="js/export.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
