@@ -19,6 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -49,6 +50,7 @@ fun DetailScreen(
     viewModel: DetailViewModel = viewModel(factory = DetailViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val offlineProbeResult by viewModel.offlineProbeResult.collectAsStateWithLifecycle()
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshResumePoint() }
 
@@ -75,6 +77,11 @@ fun DetailScreen(
                 show = current.show,
                 resumePositionMs = current.resumePositionMs,
                 onPlay = { onPlay(current.show.id) },
+                offlineProbe = if (viewModel.offlineProbeAvailable) {
+                    OfflineProbeUi(offlineProbeResult, viewModel::runOfflineLicenseProbe)
+                } else {
+                    null
+                },
                 modifier = Modifier.padding(innerPadding),
             )
         }
@@ -86,6 +93,7 @@ private fun DetailContent(
     show: ShowDetail,
     resumePositionMs: Long,
     onPlay: () -> Unit,
+    offlineProbe: OfflineProbeUi?,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -131,6 +139,14 @@ private fun DetailContent(
                     },
                 )
             }
+            if (offlineProbe != null) {
+                OutlinedButton(onClick = offlineProbe.onRun, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.detail_offline_probe))
+                }
+                offlineProbe.result?.let { result ->
+                    Text(text = result, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                }
+            }
             if (show.synopsis.isNotBlank()) {
                 Text(
                     text = show.synopsis,
@@ -141,3 +157,6 @@ private fun DetailContent(
         }
     }
 }
+
+/** Stato e azione della sonda diagnostica della licenza offline (solo build debug). */
+private data class OfflineProbeUi(val result: String?, val onRun: () -> Unit)

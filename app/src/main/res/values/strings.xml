@@ -54,4 +54,5 @@
     <string name="error_device_limit">Il tuo account ha raggiunto il numero massimo di dispositivi. Rimuovi un dispositivo che non usi più dall\'area personale del sito Proscaenia e riprova.</string>
     <string name="error_playback_drm">Impossibile ottenere la licenza di protezione del video. Riprova; se il problema persiste, invia il file di log.</string>
     <string name="error_playback_generic">Errore di riproduzione (%1$s).</string>
+    <string name="detail_offline_probe">Verifica licenza offline (diagnostica)</string>
 </resources>

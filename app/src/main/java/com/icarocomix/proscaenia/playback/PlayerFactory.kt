@@ -37,16 +37,19 @@ class PlayerFactory(
      * CacheDataSource: nessun byte del flusso viene scritto su disco. DefaultDataSource aggiunge il
      * supporto agli schemi locali (data:, file:, asset:) senza modificare il percorso HTTP.
      */
-    private val httpDataSourceFactory = OkHttpDataSource.Factory(mediaHttpClient).setUserAgent(userAgent)
+    val httpDataSourceFactory = OkHttpDataSource.Factory(mediaHttpClient).setUserAgent(userAgent)
 
     val dataSourceFactory: DataSource.Factory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
 
     fun createExoPlayer(voiceBoostProcessor: AudioProcessor): ExoPlayer {
-        // Buffer esclusivamente in RAM (DefaultLoadControl usa un allocatore in memoria) e
-        // volutamente corto: almeno 15 s e al massimo 40 s di contenuto, avvio appena ci sono 1,5 s
-        // e ripartenza dopo un'attesa con 3 s. Un buffer corto limita la memoria occupata su
-        // dispositivi modesti e riduce lo spreco di banda quando l'utente salta avanti o chiude.
+        // Buffer esclusivamente in RAM (DefaultLoadControl usa un allocatore in memoria). Il buffer
+        // corto iniziale (15–40 s, ripartenza con 3 s) causava stalli percepiti come lag: un calo di
+        // banda di pochi secondi svuotava il buffer e la ripartenza con soli 3 s ricadeva subito in
+        // attesa. Ora tengo almeno 30 s sempre garantiti e cresco fino a 120 s, fermandomi prima se
+        // il buffer supera TARGET_BUFFER_BYTES: con la priorità al tempo la soglia in byte vale solo
+        // oltre il minimo, così la memoria resta limitata anche ad alto bitrate. Dopo uno stallo
+        // riparto con 8 s per non rientrare subito in attesa. L'avvio resta rapido (1,5 s).
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 MIN_BUFFER_MS,
@@ -54,6 +57,7 @@ class PlayerFactory(
                 BUFFER_FOR_PLAYBACK_MS,
                 BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
             )
+            .setTargetBufferBytes(TARGET_BUFFER_BYTES)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
@@ -107,6 +111,9 @@ class PlayerFactory(
             )
             .build()
 
+        // Misuro stalli, fotogrammi persi, underrun audio e cambi di qualità per capire la causa del lag.
+        player.addAnalyticsListener(PlaybackDiagnostics())
+
         // Sottotitoli spenti di default: il tipo di traccia testo resta disabilitato finché l'utente
         // non lo attiva esplicitamente dal player.
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
@@ -116,10 +123,11 @@ class PlayerFactory(
     }
 
     companion object {
-        const val MIN_BUFFER_MS = 15_000
-        const val MAX_BUFFER_MS = 40_000
+        const val MIN_BUFFER_MS = 30_000
+        const val MAX_BUFFER_MS = 120_000
         const val BUFFER_FOR_PLAYBACK_MS = 1_500
-        const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 3_000
+        const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 8_000
+        const val TARGET_BUFFER_BYTES = 96 * 1_024 * 1_024
         const val SEEK_INCREMENT_MS = 10_000L
     }
 }

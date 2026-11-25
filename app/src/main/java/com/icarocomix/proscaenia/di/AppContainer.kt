@@ -27,6 +27,7 @@ import com.icarocomix.proscaenia.domain.repository.CatalogRepository
 import com.icarocomix.proscaenia.domain.repository.StreamRepository
 import com.icarocomix.proscaenia.playback.PlayerFactory
 import com.icarocomix.proscaenia.playback.cast.CastSupport
+import com.icarocomix.proscaenia.playback.offline.OfflineLicenseProbe
 import com.icarocomix.proscaenia.ui.common.AutoRetryTriggers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -134,4 +135,16 @@ class AppContainer(context: Context) {
     val castSupport = CastSupport(appContext)
 
     val playerFactory: PlayerFactory by lazy { PlayerFactory(appContext, mediaHttpClient, userAgent) }
+
+    /**
+     * Sonda della licenza offline, disponibile solo nelle build debug: è uno strumento diagnostico e
+     * non deve comparire nella build di produzione.
+     */
+    val offlineLicenseProbe: OfflineLicenseProbe? by lazy {
+        if (BuildConfig.DEBUG) {
+            OfflineLicenseProbe(streamRepository, playerFactory.dataSourceFactory, playerFactory.httpDataSourceFactory)
+        } else {
+            null
+        }
+    }
 }

@@ -64,3 +64,15 @@ Stato di avanzamento: riprendere dal primo punto non spuntato.
 - [x] 32. Player UI: errore rimosso da solo quando la riproduzione riparte; fix KDoc PlaybackErrors
 - [x] 33. Test unitari AutomaticRetry + build/test
 - [x] 34. Documentazione
+
+## Lag in riproduzione: licenza offline, buffer, download offline
+
+- [x] 35. Sonda licenza Widevine offline (solo build debug, pulsante nella scheda): manifest DASH → OfflineLicenseHelper → esito nel log
+- [x] 36. Build debug + installazione Pixel 7 + esecuzione sonda e lettura log
+- [ ] 37. Diagnosi lag e regolazione buffer (LoadControl, ABR)
+- [x] 38. Download offline: NON FATTIBILE — KeyOS risponde 200 + JSON "Widevine license generation failed (MISSING_RENEWAL_SIGNING_KEY)" alla richiesta offline
+- [ ] 39. Documentazione
+- [x] 37a. Diagnostica riproduzione (PlaybackDiagnostics) + buffer 30–120 s / 96 MB / ripartenza 8 s: sul Pixel 7 0 stalli in 5 min; lag segnalato solo in Cast alla TV
+- [x] 40. (testato dall utente sulla TV; APK pronto: dist/proscaenia-tv-prova-debug.apk, LEANBACK_LAUNCHER + banner + log DeviceCapabilities; ADB TV "unauthorized", installazione manuale) Prova app su TV "Smart TV Pro" (Cast integrato, 192.168.1.61): ADB in rete, installazione APK debug, livello Widevine, login, riproduzione, diagnostica
+- [ ] 41. Decisione: app Android TV (UI telecomando + pre-scaricamento cifrato) vs server locale per Chromecast
+- [x] 42. Build release minificata 1.0.0.22 (4,7 MB, 23 test OK) + avvio verificato sul Pixel 7

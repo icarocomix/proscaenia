@@ -6,6 +6,7 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
+import com.icarocomix.proscaenia.core.device.DeviceCapabilitiesLog
 import com.icarocomix.proscaenia.core.logging.AppLog
 import com.icarocomix.proscaenia.di.AppContainer
 
@@ -27,6 +28,7 @@ class ProscaeniaApp : Application(), SingletonImageLoader.Factory {
         // del contenitore delle dipendenze finisce nel file di log consultabile dall'utente.
         AppLog.init(this)
         container = AppContainer(this)
+        DeviceCapabilitiesLog.logAsync(this)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =

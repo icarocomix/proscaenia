@@ -10,6 +10,7 @@ import com.icarocomix.proscaenia.data.local.PlaybackPositionStore
 import com.icarocomix.proscaenia.domain.model.ShowDetail
 import com.icarocomix.proscaenia.domain.policy.ResumePolicy
 import com.icarocomix.proscaenia.domain.repository.CatalogRepository
+import com.icarocomix.proscaenia.playback.offline.OfflineLicenseProbe
 import com.icarocomix.proscaenia.ui.common.AutoRetryTriggers
 import com.icarocomix.proscaenia.ui.common.ErrorMessages
 import com.icarocomix.proscaenia.ui.common.UiMessage
@@ -36,6 +37,7 @@ class DetailViewModel(
     private val catalogRepository: CatalogRepository,
     private val positionStore: PlaybackPositionStore,
     autoRetryTriggers: AutoRetryTriggers,
+    private val offlineLicenseProbe: OfflineLicenseProbe?,
 ) : ViewModel() {
 
     private val showId: String = checkNotNull(savedStateHandle[Routes.ARG_SHOW_ID]) {
@@ -52,6 +54,20 @@ class DetailViewModel(
                 if ((_state.value as? DetailUiState.Failure)?.retryable == true) load()
             }
         }
+    }
+
+    /** True solo nelle build debug, dove la sonda della licenza offline è disponibile. */
+    val offlineProbeAvailable: Boolean get() = offlineLicenseProbe != null
+
+    private val _offlineProbeResult = MutableStateFlow<String?>(null)
+    val offlineProbeResult: StateFlow<String?> = _offlineProbeResult.asStateFlow()
+
+    /** Avvio la sonda una volta per volta: un secondo tocco durante la prova viene ignorato. */
+    fun runOfflineLicenseProbe() {
+        val probe = offlineLicenseProbe ?: return
+        if (_offlineProbeResult.value == PROBE_RUNNING) return
+        _offlineProbeResult.value = PROBE_RUNNING
+        viewModelScope.launch { _offlineProbeResult.value = probe.run(showId) }
     }
 
     fun load() {
@@ -78,10 +94,18 @@ class DetailViewModel(
         ResumePolicy.resumePositionMs(positionStore.read(show.id), show.durationSeconds?.times(1_000))
 
     companion object {
+        const val PROBE_RUNNING = "Verifica in corso…"
+
         val Factory = viewModelFactory {
             initializer {
                 val container = appContainer()
-                DetailViewModel(createSavedStateHandle(), container.catalogRepository, container.positionStore, container.autoRetryTriggers)
+                DetailViewModel(
+                    createSavedStateHandle(),
+                    container.catalogRepository,
+                    container.positionStore,
+                    container.autoRetryTriggers,
+                    container.offlineLicenseProbe,
+                )
             }
         }
     }
