@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -16,6 +17,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.icarocomix.proscaenia.R
+import com.icarocomix.proscaenia.ui.tv.tvFocusHighlight
 
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
@@ -47,6 +49,6 @@ fun ErrorState(
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
         )
-        Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
+        Button(onClick = onRetry, modifier = Modifier.tvFocusHighlight(ButtonDefaults.shape)) { Text(stringResource(R.string.action_retry)) }
     }
 }

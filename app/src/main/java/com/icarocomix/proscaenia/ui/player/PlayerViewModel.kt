@@ -184,6 +184,9 @@ class PlayerViewModel(
             }
             // Stesso spettacolo ma fermo su un errore: riprovo dalla posizione in cui si era fermato.
             controller.playerError != null -> restartFromCurrentPosition(controller, detail)
+            // Stesso spettacolo fermato (Stop esplicito o app uscita dal primo piano sulla TV): lo
+            // riapro dal punto in cui era stato fermato, con un link nuovo.
+            controller.playbackState == Player.STATE_IDLE -> restartFromCurrentPosition(controller, detail)
         }
         _player.value = controller
         _state.update { it.copy(isConnected = true) }
@@ -243,6 +246,54 @@ class PlayerViewModel(
 
     fun dismissError() = _state.update { it.copy(error = null, errorRetryable = false) }
 
+    // ------------------------------------------------------------------ comandi dell'OSD (TV)
+
+    /**
+     * Play/Pausa. Se lo spettacolo è stato fermato (stato IDLE senza errori) un semplice play non
+     * basterebbe, perché il player ha rilasciato la sorgente: lo ripreparo dalla posizione corrente.
+     */
+    fun togglePlayPause() {
+        val controller = currentController() ?: return
+        if (controller.playbackState == Player.STATE_IDLE && controller.playerError == null) {
+            show?.let { restartFromCurrentPosition(controller, it) }
+            return
+        }
+        if (controller.playWhenReady) controller.pause() else controller.play()
+    }
+
+    fun seekBack() {
+        currentController()?.takeIf { it.isCommandAvailable(Player.COMMAND_SEEK_BACK) }?.seekBack()
+    }
+
+    fun seekForward() {
+        currentController()?.takeIf { it.isCommandAvailable(Player.COMMAND_SEEK_FORWARD) }?.seekForward()
+    }
+
+    /**
+     * Stop esplicito: metto prima in pausa, così il servizio salva subito la posizione (lo fa a ogni
+     * arresto della riproduzione), poi fermo il player, che rilascia decoder e licenza ma conserva lo
+     * spettacolo per un'eventuale ripresa. La navigazione fuori dal player la decide la schermata.
+     */
+    fun stop() {
+        val controller = currentController() ?: return
+        controller.pause()
+        controller.stop()
+    }
+
+    /**
+     * Rientro nella schermata (ON_START): se nel frattempo il servizio ha fermato lo spettacolo, perché
+     * sulla TV l'app era uscita dal primo piano, lo ripreparo dalla posizione salvata ma in pausa.
+     * L'utente ritrova il punto esatto e decide lui quando ripartire, senza audio improvviso.
+     */
+    fun onScreenStarted() {
+        val controller = currentController() ?: return
+        val detail = show ?: return
+        val stopped = controller.currentMediaItem?.mediaId == showId &&
+            controller.playbackState == Player.STATE_IDLE &&
+            controller.playerError == null
+        if (stopped) restartFromCurrentPosition(controller, detail, playWhenReady = false)
+    }
+
     override fun onCleared() {
         controllerFuture?.let(MediaController::releaseFuture)
         controllerFuture = null
@@ -254,12 +305,16 @@ class PlayerViewModel(
      * servizio risolve un URL nuovo (utile dopo che i tentativi automatici sono falliti) ma non
      * applica la regola di ripresa, che partirebbe dall'ultima posizione salvata.
      */
-    private fun restartFromCurrentPosition(controller: MediaController, detail: ShowDetail) {
+    private fun restartFromCurrentPosition(
+        controller: MediaController,
+        detail: ShowDetail,
+        playWhenReady: Boolean = true,
+    ) {
         dismissError()
         val position = controller.currentPosition.coerceAtLeast(0)
         controller.setMediaItem(PlaybackRequests.forShow(detail), position)
         controller.prepare()
-        controller.play()
+        controller.playWhenReady = playWhenReady
     }
 
     private fun currentController(): MediaController? =

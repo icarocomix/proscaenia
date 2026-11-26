@@ -17,6 +17,11 @@
     var SITE_ORIGIN = 'https://proscaenia.com';
     var CURRENT_BUILD = 'ios_1';
     var DEFAULT_TIMEOUT_MS = 20000;
+    // Attese tra i tentativi sugli errori transitori: 5 tentativi in circa 15 s, come AutomaticRetry su Android.
+    var RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
+    // Il rifiuto dell'accesso automatico lo ripeto una sola volta: insistere farebbe scattare la
+    // protezione anti forza bruta del backend.
+    var REJECTED_RETRY_DELAY_MS = 2000;
 
     var LICENSE_URLS = {
         widevine: 'https://drm.proscaenia.com?drm-type=widevine',
@@ -78,6 +83,18 @@
     });
 
     var token = storeGet(KEY_TOKEN);
+    // Generazione del token: cambia a ogni login o cancellazione. Chi riceve un 401 chiede il rinnovo
+    // indicando la generazione usata, così se un'altra chiamata ha già rinnovato non rifaccio il login.
+    var generation = 0;
+    // Login automatico in corso: le chiamate che arrivano nel frattempo lo attendono invece di
+    // avviarne un secondo, che potrebbe invalidare il token appena ottenuto.
+    var pendingLogin = null;
+
+    function setToken(value) {
+        token = value;
+        generation++;
+        storeSet(KEY_TOKEN, value);
+    }
 
     function platformHeaders() {
         return {
@@ -154,18 +171,166 @@
         });
     }
 
+    // ------------------------------------------------------------ sessione e ritentativi
+
+    function wait(ms) {
+        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    }
+
+    /** Errori per cui ha senso riprovare da soli: rete/CORS/timeout, server in difficoltà, 408 e 429. */
+    function isTransient(result) {
+        return result.status === 0 || result.status >= 500 || result.status === 408 || result.status === 429;
+    }
+
+    /**
+     * Ripeto [task] sugli errori transitori con attese crescenti; il rifiuto dei dati di accesso lo
+     * ripeto al massimo [rejectedRetries] volte. Gli altri esiti (abbonamento non attivo, limite di
+     * dispositivi, contenuto inesistente) tornano subito al chiamante.
+     */
+    function withRetry(label, task, rejectedRetries) {
+        var rejectedLeft = rejectedRetries || 0;
+        function run(attempt) {
+            return task().then(function (result) {
+                if (result.ok) return result;
+                if (isTransient(result) && attempt < RETRY_DELAYS_MS.length) {
+                    var delay = RETRY_DELAYS_MS[attempt];
+                    Log.w(label + ': ' + describe(result) + ', nuovo tentativo tra ' + delay / 1000 + ' s');
+                    return wait(delay).then(function () { return run(attempt + 1); });
+                }
+                if (result.rejected && rejectedLeft > 0) {
+                    rejectedLeft--;
+                    Log.w(label + ': dati di accesso rifiutati (' + describe(result) + '), riprovo una volta');
+                    return wait(REJECTED_RETRY_DELAY_MS).then(function () { return run(attempt); });
+                }
+                return result;
+            });
+        }
+        return run(0);
+    }
+
+    /**
+     * Una singola richiesta di login. Classifico l'esito: il backend usa lo stesso 401 per credenziali
+     * errate e per il limite di dispositivi, quindi distinguo dal codice in errors[0].
+     */
+    function loginRequest(email, password) {
+        return api('auth/login', { method: 'POST', body: { email: email, password: password, remember: true } }).then(function (result) {
+            var json = result.json;
+            var firstError = json && json.errors && json.errors[0];
+            if (firstError === 'MAX Device') result.reason = 'Limite di dispositivi raggiunto: liberane uno dal sito';
+            else if (firstError === 'Not active subscription') result.reason = 'Abbonamento non attivo';
+            if (result.ok && json && json.access_token) {
+                setToken(json.access_token);
+            } else if (result.ok) {
+                result.ok = false;
+                result.reason = 'Risposta senza access_token';
+            } else if (!result.reason && (result.status === 400 || result.status === 401 || result.status === 403 || result.status === 422)) {
+                result.rejected = true;
+            }
+            return result;
+        });
+    }
+
+    /**
+     * Garantisco un token prima di una chiamata autenticata. Se manca (primo uso, posto liberato
+     * all'uscita, token rifiutato) rifaccio il login con i dati salvati, senza chiedere nulla
+     * all'utente. needsLogin è vero solo quando sulla TV non ci sono dati di accesso salvati.
+     */
+    function ensureSession() {
+        if (token) return Promise.resolve({ ok: true });
+        if (pendingLogin) return pendingLogin;
+        var saved = SecureStore.get();
+        if (!SecureStore.has()) {
+            return Promise.resolve({ ok: false, status: 0, needsLogin: true, failure: 'nessun dato di accesso salvato' });
+        }
+        Log.i('Accesso automatico con i dati salvati');
+        pendingLogin = withRetry('Accesso automatico', function () {
+            return loginRequest(saved.email, saved.password);
+        }, 1).then(function (result) {
+            pendingLogin = null;
+            if (result.ok) {
+                Log.i('Accesso automatico riuscito: ' + describe(result));
+            } else {
+                if (result.rejected) result.reason = 'La piattaforma ha rifiutato i dati di accesso salvati';
+                Log.e('Accesso automatico non riuscito: ' + describe(result) + (result.reason ? ' – ' + result.reason : ''));
+            }
+            return result;
+        }, function (error) {
+            pendingLogin = null;
+            throw error;
+        });
+        return pendingLogin;
+    }
+
+    /** Rinnovo la sessione solo se nessun'altra chiamata l'ha già fatto dopo il 401 ricevuto. */
+    function renewSession(rejectedGeneration) {
+        if (token && generation !== rejectedGeneration) return Promise.resolve({ ok: true });
+        if (token) setToken(null);
+        return ensureSession();
+    }
+
+    /**
+     * Chiamata autenticata: sessione garantita, ritentativi sugli errori transitori e, su un 401,
+     * rinnovo del token e una sola ripetizione (un rifiuto definitivo non deve generare un ciclo).
+     * Se la sessione non si apre restituisco l'esito del login, marcato con sessionFailed.
+     */
+    function authorized(label, path, options) {
+        var call = function () { return api(path, { method: options && options.method, auth: true }); };
+        var sessionFailure = function (session) {
+            session.ok = false;
+            session.sessionFailed = true;
+            return session;
+        };
+        return ensureSession().then(function (session) {
+            if (!session.ok) return sessionFailure(session);
+            var usedGeneration = generation;
+            return withRetry(label, call).then(function (result) {
+                if (result.status !== 401) return result;
+                Log.w('Token rifiutato (HTTP 401) su ' + path + ': rinnovo la sessione con i dati salvati');
+                return renewSession(usedGeneration).then(function (renewed) {
+                    return renewed.ok ? withRetry(label, call) : sessionFailure(renewed);
+                });
+            });
+        });
+    }
+
     function absolute(raw) {
         try { return new URL(raw, BASE_URL).toString(); } catch (e) { return null; }
     }
 
-    // Catalogo: righe editoriali nell'ordine del sito, con le schede risolte dagli show_ids.
+    // La sinossi arriva come HTML con entità di ogni tipo: la faccio interpretare al parser del
+    // motore web (come HtmlCompat su Android) e compatto gli spazi, compresi quelli non separabili.
+    function stripHtml(html) {
+        if (!html) return '';
+        try {
+            var text = new DOMParser().parseFromString(String(html), 'text/html').body.textContent || '';
+            return text.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+        } catch (e) {
+            return String(html).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+    }
+
+    // Catalogo: righe editoriali nell'ordine del sito, con le schede risolte dagli show_ids. Come su
+    // Android preferisco la locandina (img_preview) con ripiego sull'immagine di testata.
     function mapCatalog(json) {
+        var categories = {};
+        (json.categories || []).forEach(function (category) {
+            if (category && category.id !== undefined && category.id !== null) categories[String(category.id)] = category.name || null;
+        });
         var shows = {};
         (json.shows || []).forEach(function (show) {
-            if (show && show.id !== undefined && show.id !== null) shows[String(show.id)] = { id: String(show.id), title: show.title || String(show.id) };
+            if (!show || show.id === undefined || show.id === null) return;
+            var image = show.img_preview || show.img_header;
+            shows[String(show.id)] = {
+                id: String(show.id),
+                title: show.title || String(show.id),
+                thumbnail: image ? absolute(image) : null,
+                category: show.category_id !== undefined && show.category_id !== null ? categories[String(show.category_id)] || null : null,
+                synopsis: stripHtml(show.content)
+            };
         });
         return (json.rows || []).map(function (row) {
             return {
+                id: String(row.id),
                 title: row.title || String(row.id),
                 shows: (row.show_ids || []).map(function (id) { return shows[String(id)]; }).filter(Boolean)
             };
@@ -200,7 +365,22 @@
         request: request,
         describe: describe,
         hasToken: function () { return !!token; },
-        savedEmail: function () { return storeGet(KEY_EMAIL) || ''; },
+
+        /** Da chiamare all'avvio prima di scegliere la prima schermata: carica i dati di accesso salvati. */
+        init: function () { return SecureStore.load(); },
+
+        /** Vero se sulla TV ci sono dati di accesso salvati: allora il login non va mai più chiesto. */
+        hasCredentials: function () { return SecureStore.has(); },
+
+        /** Dimentico un token che il backend ha rifiutato: il prossimo uso rifarà il login automatico. */
+        forgetToken: function () { setToken(null); },
+
+        savedEmail: function () {
+            var saved = SecureStore.get();
+            return (saved && saved.email) || storeGet(KEY_EMAIL) || '';
+        },
+
+        ensureSession: ensureSession,
 
         /** Header da aggiungere alle richieste di licenza, come fa l'app Android (Origin/Referer esclusi: vietati). */
         licenseHeaders: function () {
@@ -220,27 +400,26 @@
             });
         },
 
-        login: function (email, password) {
+        /**
+         * Primo accesso dalla schermata di login. Verifico i dati con un login reale e li salvo solo
+         * se la piattaforma li accetta: salvarli prima vorrebbe dire non chiedere mai più una password
+         * digitata male. Ripeto da solo gli errori di rete, non il rifiuto, che qui significa davvero
+         * dati errati. Un "MAX Device" non salva nulla: non è documentato che il backend verifichi la
+         * password prima del limite di dispositivi. result.saved indica se il salvataggio è riuscito.
+         */
+        signIn: function (email, password) {
             storeSet(KEY_EMAIL, email);
-            return api('auth/login', { method: 'POST', body: { email: email, password: password, remember: true } }).then(function (result) {
-                var json = result.json;
-                var firstError = json && json.errors && json.errors[0];
-                if (firstError === 'MAX Device') result.reason = 'Limite di dispositivi raggiunto: liberane uno dal sito';
-                else if (firstError === 'Not active subscription') result.reason = 'Abbonamento non attivo';
-                if (result.ok && json && json.access_token) {
-                    token = json.access_token;
-                    // Conservo il token per poter liberare il posto anche dopo un'uscita brusca dell'app.
-                    storeSet(KEY_TOKEN, token);
-                } else if (result.ok) {
-                    result.ok = false;
-                    result.reason = 'Risposta senza access_token';
-                }
-                return result;
+            return withRetry('Primo accesso', function () { return loginRequest(email, password); }, 0).then(function (result) {
+                if (!result.ok) return result;
+                return SecureStore.save({ email: email, password: password }).then(function (saved) {
+                    result.saved = saved;
+                    return result;
+                });
             });
         },
 
         show: function (showId) {
-            return api('show/' + encodeURIComponent(showId) + '?preview=false', { auth: true }).then(function (result) {
+            return authorized('Scheda ' + showId, 'show/' + encodeURIComponent(showId) + '?preview=false').then(function (result) {
                 result.show = result.ok ? mapShow(result.json) : null;
                 return result;
             });
@@ -249,20 +428,26 @@
         /**
          * Libero il posto dispositivo come il sito: DELETE user/device/{deviceId}. La rimozione riuscita
          * invalida anche il token; il logout lo uso solo come ripiego (comportamento verificato su Android).
+         * Cancello solo il token: i dati di accesso restano salvati e il login successivo avviene da solo,
+         * alla prima riproduzione. Se un login automatico è in corso lo attendo, altrimenti il suo token
+         * arriverebbe dopo la rimozione e terrebbe occupato il posto.
          */
         releaseDevice: function () {
-            if (!token) return Promise.resolve({ ok: true, skipped: true });
-            return api('user/device/' + encodeURIComponent(deviceId), { method: 'DELETE', auth: true }).then(function (removed) {
-                if (removed.ok) return removed;
-                return api('auth/logout', { auth: true }).then(function (loggedOut) {
-                    loggedOut.removal = removed;
-                    return loggedOut;
+            var before = pendingLogin ? pendingLogin.then(null, function () { /* conta solo che sia finito */ }) : Promise.resolve();
+            return before.then(function () {
+                if (!token) return { ok: true, skipped: true };
+                return api('user/device/' + encodeURIComponent(deviceId), { method: 'DELETE', auth: true }).then(function (removed) {
+                    if (removed.ok) return removed;
+                    return api('auth/logout', { auth: true }).then(function (loggedOut) {
+                        loggedOut.removal = removed;
+                        return loggedOut;
+                    });
+                }).then(function (result) {
+                    // Il token locale lo cancello comunque: un token orfano non serve più a nulla, e
+                    // un nuovo login con lo stesso DeviceId riprende lo stesso posto.
+                    setToken(null);
+                    return result;
                 });
-            }).then(function (result) {
-                // Il token locale lo cancello comunque: un token orfano non serve più a nulla.
-                token = null;
-                storeSet(KEY_TOKEN, null);
-                return result;
             });
         },
 
@@ -276,10 +461,7 @@
                 headers['Authorization'] = 'Bearer ' + token;
                 Object.keys(headers).forEach(function (name) { xhr.setRequestHeader(name, headers[name]); });
                 xhr.send(null);
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    token = null;
-                    storeSet(KEY_TOKEN, null);
-                }
+                if (xhr.status >= 200 && xhr.status < 300) setToken(null);
             } catch (e) { /* nulla da fare in fase di chiusura */ }
         }
     };

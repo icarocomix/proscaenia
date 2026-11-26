@@ -21,6 +21,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.ListenableFuture
 import com.icarocomix.proscaenia.ProscaeniaApp
+import com.icarocomix.proscaenia.core.device.DeviceForm
 import com.icarocomix.proscaenia.di.AppContainer
 import com.icarocomix.proscaenia.domain.model.SavedPosition
 import com.icarocomix.proscaenia.domain.policy.ResumePolicy
@@ -30,6 +31,7 @@ import com.icarocomix.proscaenia.ui.MainActivity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -75,6 +77,9 @@ class PlaybackService : MediaSessionService() {
     private val isRemote: Boolean
         get() = sessionPlayer.deviceInfo.playbackType == DeviceInfo.PLAYBACK_TYPE_REMOTE
 
+    /** Sulla TV l'audio non deve mai proseguire con l'app fuori dal primo piano. */
+    private val isTelevision: Boolean by lazy { DeviceForm.isTelevision(this) }
+
     override fun onCreate() {
         super.onCreate()
         val preferences = container.playbackPreferences
@@ -109,6 +114,8 @@ class PlaybackService : MediaSessionService() {
 
         observeVoiceBoostPreference()
         observeReconnections()
+        observeStatusCommands()
+        if (isTelevision) observeUiVisibilityOnTv()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
@@ -127,6 +134,12 @@ class PlaybackService : MediaSessionService() {
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
         saveCurrentPosition(synchronous = true)
+        // Sulla TV la chiusura dell'app ferma sempre l'audio: lì non esiste un "ascolto in tasca".
+        if (isTelevision && !isRemote) {
+            stopLocalPlayback("app chiusa dalle recenti (TV)")
+            stopSelf()
+            return
+        }
         val player = mediaSession?.player
         if (player == null || !player.playWhenReady || player.mediaItemCount == 0 || player.playbackState == Player.STATE_ENDED) {
             stopSelf()
@@ -144,6 +157,7 @@ class PlaybackService : MediaSessionService() {
         castPlayer?.release()
         exoPlayer.release()
         container.onPlaybackActiveChanged(false)
+        container.playbackStatus.publish(null)
         super.onDestroy()
     }
 
@@ -339,6 +353,7 @@ class PlaybackService : MediaSessionService() {
             val state = player.playbackState
             val active = player.mediaItemCount > 0 && (state == Player.STATE_READY || state == Player.STATE_BUFFERING)
             container.onPlaybackActiveChanged(active)
+            publishStatus(player, active)
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -456,6 +471,73 @@ class PlaybackService : MediaSessionService() {
                 mediaSession?.sendError(PlaybackErrors.toSessionError(e))
             }
         }
+    }
+
+    // ------------------------------------------------------------------ stato verso la UI e arresto
+
+    /**
+     * Pubblico lo spettacolo caricato per la barra "In riproduzione" di catalogo e scheda. Conta solo
+     * una riproduzione attiva (in corso, in buffering o in pausa): fermo o terminato non c'è nulla da
+     * mostrare né da fermare.
+     */
+    private fun publishStatus(player: Player, active: Boolean) {
+        val showId = player.currentMediaItem?.mediaId?.takeIf { it.isNotBlank() }
+        val nowPlaying = if (active && showId != null) {
+            NowPlaying(
+                showId = showId,
+                title = player.mediaMetadata.title?.toString() ?: currentShow?.metadata?.title?.toString() ?: "",
+                isPlaying = player.playWhenReady,
+            )
+        } else {
+            null
+        }
+        container.playbackStatus.publish(nowPlaying)
+    }
+
+    /** Eseguo i comandi arrivati dalla barra "In riproduzione" (Stop esplicito, anche durante il Cast). */
+    private fun observeStatusCommands() {
+        lifecycleScope.launch {
+            container.playbackStatus.commands.collect { command ->
+                when (command) {
+                    PlaybackStatus.Command.STOP -> stopLocalPlayback("Stop dalla barra In riproduzione", includeRemote = true)
+                }
+            }
+        }
+    }
+
+    /**
+     * Sulla TV fermo la riproduzione appena l'interfaccia esce dal primo piano (tasto Home, cambio di
+     * app, salvaschermo, uscita con Indietro): l'audio può accompagnare la navigazione dentro l'app,
+     * mai fuori. Reagisco solo ai cambiamenti (`drop(1)`): se il servizio nasce con l'interfaccia già
+     * nascosta, per esempio comandato da un controller esterno, non lo fermo alla nascita.
+     *
+     * Durante il Cast non intervengo, per non alterare il percorso Chromecast esistente.
+     */
+    private fun observeUiVisibilityOnTv() {
+        lifecycleScope.launch {
+            container.uiVisibility.drop(1).collect { visible ->
+                if (!visible && !isRemote) stopLocalPlayback("app uscita dal primo piano (TV)")
+            }
+        }
+    }
+
+    /**
+     * Fermo la riproduzione salvando prima la posizione. Uso stop() e non la rimozione dello
+     * spettacolo: il player rilascia decoder, sessione DRM e connessioni ma conserva spettacolo e
+     * posizione, così al rientro il player della UI può riprepararlo dallo stesso punto. Lo stato IDLE
+     * conseguente conta come "nessuna riproduzione attiva", quindi con l'app in background il posto
+     * dispositivo viene liberato come previsto.
+     */
+    private fun stopLocalPlayback(reason: String, includeRemote: Boolean = false) {
+        if (!::sessionPlayer.isInitialized) return
+        if (isRemote && !includeRemote) return
+        if (sessionPlayer.mediaItemCount == 0 || sessionPlayer.playbackState == Player.STATE_IDLE) return
+        AppLog.i(TAG, "Riproduzione fermata: $reason")
+        saveCurrentPosition(synchronous = true)
+        urlRecoveryJob?.cancel()
+        waitingForNetwork = false
+        sessionPlayer.pause()
+        sessionPlayer.stop()
     }
 
     // ------------------------------------------------------------------ salvataggio della posizione

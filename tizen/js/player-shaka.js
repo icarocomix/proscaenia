@@ -58,7 +58,12 @@
         });
     }
 
-    function play(part, drmName, startSeconds, onStateChange) {
+    /**
+     * Avvio la riproduzione di una parte. Con options.startPaused preparo il flusso (manifest, licenza,
+     * posizione) senza far partire l'audio: serve alla ripresa dopo che l'app è tornata in primo piano.
+     */
+    function play(part, drmName, startSeconds, onStateChange, options) {
+        var startPaused = !!(options && options.startPaused);
         video = document.getElementById('video');
         shaka.polyfill.installAll();
         if (!shaka.Player.isBrowserSupported()) {
@@ -97,6 +102,7 @@
         });
         player.addEventListener('buffering', function (event) {
             Log.i('Shaka: buffering ' + (event.buffering ? 'iniziato' : 'terminato'));
+            onStateChange(event.buffering ? 'buffering' : (video.paused ? 'in pausa' : 'in riproduzione'));
         });
         player.addEventListener('adaptation', function () {
             var track = player.getVariantTracks().filter(function (t) { return t.active; })[0];
@@ -105,6 +111,7 @@
         onVideo('playing', function () { onStateChange('in riproduzione'); Log.i('Video: playing a ' + video.currentTime.toFixed(1) + ' s'); });
         onVideo('waiting', function () { Log.w('Video: waiting (stallo) a ' + video.currentTime.toFixed(1) + ' s'); });
         onVideo('pause', function () { onStateChange('in pausa'); });
+        onVideo('ended', function () { onStateChange('terminato'); });
         onVideo('error', function () { Log.e('Video: errore elemento', video.error ? { code: video.error.code, message: video.error.message } : null); });
 
         Log.i('Shaka ' + shaka.Player.version + ': carico ' + part.dash + ' con ' + drmName + ' da ' + startSeconds.toFixed(0) + ' s');
@@ -115,6 +122,10 @@
             var drmInfo = player.drmInfo();
             Log.i('Shaka: manifest caricato, DRM attivo ' + (drmInfo ? drmInfo.keySystem : 'nessuno') + ', durata ' + video.duration.toFixed(0) + ' s');
             statsTimer = setInterval(logStats, STATS_INTERVAL_MS);
+            if (startPaused) {
+                onStateChange('in pausa');
+                return true;
+            }
             return video.play().then(function () { return true; }, function (error) {
                 Log.e('Video: play() rifiutato', error);
                 return false;
@@ -130,9 +141,14 @@
         play: play,
         stop: stop,
         togglePause: function () {
-            if (!video) return;
+            if (!video || !player) return;
             if (video.paused) video.play(); else video.pause();
         },
+        pause: function () {
+            if (video && player && !video.paused) video.pause();
+        },
+        isPaused: function () { return !video || video.paused; },
+        durationMs: function () { return video && isFinite(video.duration) ? Math.round(video.duration * 1000) : 0; },
         seekBy: function (seconds) {
             if (video && isFinite(video.duration)) video.currentTime = Math.max(0, Math.min(video.duration - 1, video.currentTime + seconds));
         },

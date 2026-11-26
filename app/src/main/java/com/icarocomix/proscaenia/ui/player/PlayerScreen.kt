@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.view.View
+import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,6 +46,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -54,6 +57,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
@@ -64,6 +69,7 @@ import com.icarocomix.proscaenia.ui.common.LoadingState
 import com.icarocomix.proscaenia.ui.common.UiMessage
 import com.icarocomix.proscaenia.ui.common.asString
 import com.icarocomix.proscaenia.ui.common.formatSpeed
+import com.icarocomix.proscaenia.ui.tv.LocalTvMode
 
 /**
  * Schermata del player.
@@ -83,9 +89,19 @@ fun PlayerScreen(
     val player by viewModel.player.collectAsStateWithLifecycle()
     var controlsVisible by remember { mutableStateOf(true) }
     var showSpeedSheet by rememberSaveable { mutableStateOf(false) }
+    val isTv = LocalTvMode.current
+    val retryFocus = remember { FocusRequester() }
 
-    RequestNotificationPermission()
+    // Sulla TV la notifica multimediale non è visibile all'utente: non chiedo un permesso inutile.
+    if (!isTv) RequestNotificationPermission()
     BackHandler(onBack = onBack)
+    // Al rientro nell'app riprendo (in pausa) uno spettacolo che il servizio ha fermato in background.
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.onScreenStarted() }
+
+    val stopAndLeave = {
+        viewModel.stop()
+        onBack()
+    }
 
     Box(
         modifier = Modifier
@@ -97,6 +113,14 @@ fun PlayerScreen(
         AndroidView(
             factory = { context ->
                 PlayerView(context).apply {
+                    if (isTv) {
+                        // Sulla TV i controlli sono l'OSD Compose: la PlayerView mostra solo video,
+                        // sottotitoli e indicatore di buffering, e non deve mai prendere il focus,
+                        // altrimenti i tasti del telecomando finirebbero a lei invece che all'OSD.
+                        useController = false
+                        isFocusable = false
+                        descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                    }
                     setShowPreviousButton(false)
                     setShowNextButton(false)
                     setShowShuffleButton(false)
@@ -114,10 +138,12 @@ fun PlayerScreen(
             },
             update = { view ->
                 view.player = player
-                // Durante il Cast non c'è video da guardare: tengo i controlli sempre visibili, così
-                // l'utente può comandare il Chromecast senza dover toccare lo schermo nero.
-                view.controllerShowTimeoutMs = if (state.isCasting) 0 else CONTROLLER_TIMEOUT_MS
-                if (state.isCasting) view.showController()
+                if (!isTv) {
+                    // Durante il Cast non c'è video da guardare: tengo i controlli sempre visibili, così
+                    // l'utente può comandare il Chromecast senza dover toccare lo schermo nero.
+                    view.controllerShowTimeoutMs = if (state.isCasting) 0 else CONTROLLER_TIMEOUT_MS
+                    if (state.isCasting) view.showController()
+                }
             },
             onRelease = { view -> view.player = null },
             modifier = Modifier.fillMaxSize(),
@@ -130,7 +156,22 @@ fun PlayerScreen(
             )
         }
 
-        AnimatedVisibility(
+        if (isTv) {
+            TvPlayerOverlay(
+                player = player,
+                state = state,
+                refocusKey = showSpeedSheet,
+                onTogglePlayPause = viewModel::togglePlayPause,
+                onSeekBack = viewModel::seekBack,
+                onSeekForward = viewModel::seekForward,
+                onStop = stopAndLeave,
+                onToggleSubtitles = viewModel::toggleSubtitles,
+                onToggleVoiceBoost = viewModel::toggleVoiceBoost,
+                onOpenSpeed = { showSpeedSheet = true },
+            )
+        }
+
+        if (!isTv) AnimatedVisibility(
             visible = controlsVisible || state.isCasting,
             enter = fadeIn(),
             exit = fadeOut(),
@@ -151,8 +192,11 @@ fun PlayerScreen(
                 message = error,
                 onRetry = viewModel::retry,
                 onDismiss = viewModel::dismissError,
+                retryFocus = retryFocus,
                 modifier = Modifier.align(Alignment.Center),
             )
+            // Con il telecomando la scheda d'errore va raggiunta subito: porto il focus su "Riprova".
+            if (isTv) LaunchedEffect(error) { runCatching { retryFocus.requestFocus() } }
         }
     }
 
@@ -265,6 +309,7 @@ private fun PlaybackErrorCard(
     message: UiMessage,
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
+    retryFocus: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     Card(modifier = modifier.widthIn(max = 420.dp).padding(24.dp)) {
@@ -274,7 +319,7 @@ private fun PlaybackErrorCard(
         ) {
             Text(text = message.asString(), style = MaterialTheme.typography.bodyLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
+                Button(onClick = onRetry, modifier = Modifier.focusRequester(retryFocus)) { Text(stringResource(R.string.action_retry)) }
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
             }
         }

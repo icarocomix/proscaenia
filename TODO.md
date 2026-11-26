@@ -94,3 +94,31 @@ Stato di avanzamento: riprendere dal primo punto non spuntato.
       - [x] 51c. Certificato autore + profilo di firma `proscaenia`
       - [ ] 51d. Developer Mode sulla TV (utente) e `sdb connect`
       - [ ] 51e. Pacchetto, installazione e avvio (`build-wgt.sh --tv`)
+
+## Interfaccia TV: layout 10-foot, OSD player, audio in background, parità Tizen
+
+Android (solo modalità TV; telefono e Cast invariati):
+- [x] 52. Rilevamento TV + densità normalizzata a 960 dp di larghezza (canvas 10-foot)
+- [x] 53. Componenti TV con focus visibile (bordo oro + ingrandimento) e margini di overscan
+- [x] 54. Catalogo TV compatto; scheda in due colonne con "Riproduci" focalizzato all'apertura
+- [x] 55. OSD Compose del player su TV: Indietro 10 s, Play/Pausa, Stop, Avanti 10 s, barra di avanzamento, funzioni accessorie; tasti multimediali; auto-nascondimento 5 s
+- [x] 56. Stato "in riproduzione" condiviso (container) + barra "In riproduzione" con Torna al player / Stop in catalogo e scheda
+- [x] 57. Audio all'uscita dall'app su TV: stop del player quando l'interfaccia non è visibile; ripresa in pausa al rientro; schermo acceso durante l'audio in sottofondo
+- [x] 58. Build debug + test unitari (dopo controllo risorse)
+
+Tizen:
+- [x] 59. Navigazione spaziale generica (nav.js)
+- [x] 60. Catalogo/scheda/login/player/diagnostica come schermate, stile e etichette allineati ad Android
+- [x] 61. OSD player e barra "In riproduzione"; stop su visibilitychange/uscita
+- [x] 62. Verifica sintassi JS + pacchetto
+- [x] 63. Documento docs/interfaccia-tv-osd-audio.md
+- [x] 64. Tizen: tentativi automatici su tutti i player (preferito per primo, timeout 45 s), errore solo se falliscono tutti; documentazione
+- [x] 65. Tizen: scheda dettaglio spostata in alto dopo l'errore del player (scroll di pagina programmatico azzerato in nav.js)
+
+## Tizen: credenziali inserite una sola volta (parità con Android §8-§9)
+
+- [x] 66. `tizen/js/secure-store.js`: custodia cifrata (AES-GCM, chiave non estraibile in IndexedDB) con ripiego su localStorage
+- [x] 67. `api.js`: signIn (salva solo dopo login riuscito), ensureSession con login automatico, rinnovo su 401, ritentativi transitori
+- [x] 68. `app.js`/`index.html`: login solo senza credenziali salvate, nessun rimando al login su rifiuto, "Cambia account" in Diagnostica
+- [x] 69. Verifica sintassi JS + banco di prova Node (cifrato e ripiego) + documentazione (`docs/tizen-credenziali-salvate.md`, README)
+- [ ] 70. Verifica sulla TV reale (a cura dell'utente): primo login, uscita con Indietro, riavvio senza login, riproduzione con login automatico

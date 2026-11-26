@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -20,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.icarocomix.proscaenia.R
 import com.icarocomix.proscaenia.domain.policy.SpeedPolicy
 import com.icarocomix.proscaenia.ui.common.formatSpeed
+import com.icarocomix.proscaenia.ui.tv.tvFocusHighlight
 
 /**
  * Pannello di scelta della velocità: tutte le velocità da 0,5x a 3x a passi di 0,25x e un pulsante
@@ -53,6 +56,7 @@ fun SpeedSheet(
                         selected = speed == requestedSpeed,
                         onClick = { onSpeedSelected(speed) },
                         label = { Text(formatSpeed(speed)) },
+                        modifier = Modifier.tvFocusHighlight(FilterChipDefaults.shape),
                     )
                 }
             }
@@ -65,7 +69,9 @@ fun SpeedSheet(
             }
             OutlinedButton(
                 onClick = { onSpeedSelected(SpeedPolicy.DEFAULT_SPEED) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .tvFocusHighlight(ButtonDefaults.outlinedShape, focusedScale = 1.02f),
             ) {
                 Text(stringResource(R.string.player_speed_reset))
             }

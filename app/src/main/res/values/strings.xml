@@ -19,6 +19,11 @@
     <string name="duration_hours_minutes">%1$d h %2$d min</string>
     <string name="duration_minutes">%1$d min</string>
 
+    <!-- Barra "In riproduzione" (catalogo e scheda) -->
+    <string name="now_playing_label">In riproduzione</string>
+    <string name="now_playing_paused_label">In pausa</string>
+    <string name="now_playing_open">Torna al player</string>
+
     <!-- Azioni comuni -->
     <string name="action_back">Indietro</string>
     <string name="action_retry">Riprova</string>
@@ -34,6 +39,12 @@
     <string name="player_speed">Velocità di riproduzione</string>
     <string name="player_speed_reset">Torna a 1x</string>
     <string name="player_speed_cast_cap">Sul Chromecast la velocità è limitata a 2x: la tua scelta tornerà attiva sul telefono.</string>
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pausa</string>
+    <string name="player_stop">Stop</string>
+    <string name="player_rewind">Indietro 10 s</string>
+    <string name="player_forward">Avanti 10 s</string>
+    <string name="player_speed_short">Velocità</string>
     <string name="player_casting_title">In riproduzione su %1$s</string>
     <string name="player_casting_default_device">Chromecast</string>
     <string name="player_casting_body">La riproduzione è gestita dal Chromecast: usa i controlli qui sotto, la notifica o il telecomando della TV. Amplifica voce si applica solo all\'audio del telefono.</string>

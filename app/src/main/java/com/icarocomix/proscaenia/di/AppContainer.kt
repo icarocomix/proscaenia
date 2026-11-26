@@ -25,6 +25,7 @@ import com.icarocomix.proscaenia.data.repository.StreamRepositoryImpl
 import com.icarocomix.proscaenia.domain.repository.AuthRepository
 import com.icarocomix.proscaenia.domain.repository.CatalogRepository
 import com.icarocomix.proscaenia.domain.repository.StreamRepository
+import com.icarocomix.proscaenia.playback.PlaybackStatus
 import com.icarocomix.proscaenia.playback.PlayerFactory
 import com.icarocomix.proscaenia.playback.cast.CastSupport
 import com.icarocomix.proscaenia.playback.offline.OfflineLicenseProbe
@@ -33,6 +34,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -90,6 +92,15 @@ class AppContainer(context: Context) {
     val networkMonitor = NetworkMonitor(appContext)
 
     private val uiVisible = MutableStateFlow(false)
+
+    /**
+     * Visibilità dell'interfaccia in sola lettura: sulla TV il servizio di riproduzione la osserva per
+     * fermare l'audio quando l'app esce dal primo piano.
+     */
+    val uiVisibility: StateFlow<Boolean> = uiVisible.asStateFlow()
+
+    /** Stato dello spettacolo in sottofondo e comandi verso il servizio (barra "In riproduzione"). */
+    val playbackStatus = PlaybackStatus()
 
     /** Eventi su cui le schermate in errore riprovano da sole (rete tornata, app in primo piano, timer). */
     val autoRetryTriggers = AutoRetryTriggers(networkMonitor, uiVisible.asStateFlow())

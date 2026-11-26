@@ -1,7 +1,18 @@
 # Proscaenia — prova tecnica per Samsung Tizen
 
 App web Tizen (`.wgt`) che verifica sulla TV reale (UE43RU7400, Tizen 5.0) se un client Proscaenia
-nativo è realizzabile. Non è il client definitivo e non tocca l'app Android né il percorso Cast.
+nativo è realizzabile. Non tocca l'app Android né il percorso Cast.
+
+Dalla versione 0.2.0 l'interfaccia ricalca l'app Android TV (login, catalogo a righe, scheda con
+"Riproduci", player con OSD, barra "In riproduzione"); le verifiche tecniche elencate qui sotto sono
+nella schermata **Diagnostica**, raggiungibile dal login e dall'intestazione del catalogo.
+
+Scelta del player automatica: a ogni avvio l'app prova in sequenza Shaka · Widevine, Shaka ·
+PlayReady, AVPlay · PlayReady e AVPlay · Widevine, partendo da quello che ha funzionato l'ultima
+volta. Un player viene scartato se rifiuta l'avvio, se segnala un errore prima di partire o se non
+parte entro 45 s; il primo che parte diventa il preferito per i prossimi avvii. Solo se falliscono
+tutti compare un messaggio d'errore. Nella Diagnostica si può comunque scegliere il player da
+provare per primo; l'esito di ogni tentativo è nel log.
 
 Cosa verifica:
 
@@ -64,21 +75,36 @@ più restrittivi) e si ripete.
 
 ## Uso con il telecomando
 
-- **▲▼** spostano il focus, **◀▶** pure (ma dentro i campi di testo muovono il cursore), **OK** esegue.
-- Ordine consigliato: *Ambiente ed EME* → *Test API (CORS)* → email/password → *Accedi* →
-  *Carica spettacoli* → scelta → una variante di riproduzione per volta.
-- In riproduzione: **OK** o Play/Pausa mette in pausa, **◀▶** salta di ±10 s, **⏪⏩** di ±30 s,
-  **Indietro** ferma e torna al pannello.
-- **Indietro** dal pannello libera il posto dispositivo ed esce.
+- **Frecce**: navigazione spaziale tra righe e schede (dentro i campi di testo ◀▶ muovono il
+  cursore); **OK** esegue; il focus è sempre evidenziato da un bordo oro.
+- **Catalogo → scheda**: OK su una scheda apre la scheda dello spettacolo con il focus già su
+  *Riproduci* (o *Riprendi da m:ss*).
+- **Player**: qualunque tasto mostra l'OSD (Indietro 10 s, Play/Pausa, Stop, Avanti 10 s, barra di
+  avanzamento), che si nasconde dopo 5 s mentre lo spettacolo scorre. A OSD nascosto ◀▶ saltano di
+  ±10 s. I tasti Play/Pausa, Stop, ⏪⏩ del telecomando funzionano sempre.
+- **Indietro** nel player: con l'OSD visibile lo nasconde; altrimenti torna alla scheda lasciando
+  l'audio in sottofondo, con la barra *In riproduzione* (Torna al player / Stop).
+- **Home** o cambio di app/sorgente: la riproduzione si ferma sempre; rientrando sul player lo
+  spettacolo viene ripreparato in pausa dallo stesso punto.
+- **Indietro** dal catalogo (o dal login): ferma la riproduzione, libera il posto dispositivo ed esce.
 
-Il posto dispositivo resta occupato finché non si esce con Indietro o con il pulsante dedicato. Se
-l'app viene chiusa in modo brusco (tasto Home, spegnimento), al riavvio successivo un avviso lo
-segnala. Il posto si libera poi con il pulsante oppure dalla pagina dispositivi del sito.
+Il posto dispositivo resta occupato finché non si esce con Indietro o con il pulsante dedicato nella
+Diagnostica. Se l'app viene chiusa in modo brusco (spegnimento), il posto si libera con il pulsante
+oppure dalla pagina dispositivi del sito.
+
+**Dati di accesso**: si inseriscono una sola volta, al primo avvio, e vengono salvati sulla TV solo
+dopo che la piattaforma li ha accettati (cifrati con WebCrypto, chiave non estraibile in IndexedDB;
+ripiego sull'archivio locale dell'app se il motore web non li supporta). Da lì in poi il login non
+compare più: ogni volta che il servizio richiede l'accesso (prima riproduzione dopo l'avvio, token
+rifiutato, posto liberato all'uscita) il login avviene da solo con i dati salvati. L'unico modo per
+farli richiedere è **Cambia account** nella Diagnostica (doppia pressione di conferma).
 
 ## Contenuto
 
 - `config.xml`, `index.html`, `icon.png`, `css/`: struttura dell'app.
-- `js/log.js`: log, sanificazione e invio al PC. `js/api.js`: contratto API.
+- `js/nav.js`: navigazione spaziale da telecomando; `js/app.js`: schermate, OSD e ciclo di vita.
+- `js/log.js`: log, sanificazione e invio al PC. `js/api.js`: contratto API e sessione (login
+  automatico, rinnovo su 401, ritentativi). `js/secure-store.js`: custodia dei dati di accesso.
   `js/diagnostics.js`: controlli. `js/player-shaka.js`, `js/player-avplay.js`: i due motori.
   `js/export.js`: ZIP ed esportazione. `js/app.js`: interfaccia e flusso.
 - `lib/`: Shaka Player 4.16.58 (Apache-2.0) e JSZip 3.10.1 (MIT/GPLv3, usato con licenza MIT),

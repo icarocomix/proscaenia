@@ -68,12 +68,14 @@ fun AppNavHost(
             // e ogni rifiuto o errore di rete viene gestito con ritentativi automatici.
             CatalogScreen(
                 onShowSelected = { navController.navigate(Routes.show(it)) },
+                onOpenPlayer = { navController.navigate(Routes.player(it)) { launchSingleTop = true } },
             )
         }
         composable(Routes.SHOW, arguments = showIdArgument) {
             DetailScreen(
                 onBack = { navController.popBackStack() },
                 onPlay = { navController.navigate(Routes.player(it)) { launchSingleTop = true } },
+                onOpenPlayer = { navController.navigate(Routes.player(it)) { launchSingleTop = true } },
             )
         }
         composable(Routes.PLAYER, arguments = showIdArgument) {

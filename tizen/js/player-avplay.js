@@ -19,6 +19,9 @@
 
     var active = false;
     var lastTimeLog = 0;
+    // Callback di stato della riproduzione corrente: pausa e ripresa comandate da qui non generano
+    // eventi AVPlay, quindi le notifico io all'interfaccia.
+    var notifyState = function () {};
 
     function avplay() {
         return global.webapis && webapis.avplay ? webapis.avplay : null;
@@ -100,7 +103,9 @@
         return Promise.resolve();
     }
 
-    function play(part, drmName, startSeconds, onStateChange) {
+    function play(part, drmName, startSeconds, onStateChange, options) {
+        var startPaused = !!(options && options.startPaused);
+        notifyState = onStateChange;
         var av = avplay();
         if (!av) {
             Log.e('AVPlay non disponibile (webapis assente: eseguire sulla TV)');
@@ -116,8 +121,11 @@
                 active = true;
                 av.setDisplayRect(0, 0, 1920, 1080);
                 av.setListener({
-                    onbufferingstart: function () { Log.i('AVPlay: buffering iniziato'); },
-                    onbufferingcomplete: function () { Log.i('AVPlay: buffering completato'); },
+                    onbufferingstart: function () { Log.i('AVPlay: buffering iniziato'); onStateChange('buffering'); },
+                    onbufferingcomplete: function () {
+                        Log.i('AVPlay: buffering completato');
+                        onStateChange(av.getState() === 'PLAYING' ? 'in riproduzione' : 'in pausa');
+                    },
                     oncurrentplaytime: function (ms) {
                         var now = Date.now();
                         if (now - lastTimeLog >= TIME_LOG_INTERVAL_MS) {
@@ -158,8 +166,12 @@
                     // seekTo dopo prepare: la ripresa dalla posizione salvata sul server.
                     av.seekTo(startMs, function () { Log.i('AVPlay: posizionato a ' + startSeconds.toFixed(0) + ' s'); }, function (e) { Log.w('AVPlay: seek fallito', e); });
                 }
-                av.play();
-                onStateChange('in riproduzione');
+                if (startPaused) {
+                    onStateChange('in pausa');
+                } else {
+                    av.play();
+                    onStateChange('in riproduzione');
+                }
                 resolve(true);
             }, function (error) {
                 Log.e('AVPlay: prepareAsync fallito', error);
@@ -176,7 +188,28 @@
         togglePause: function () {
             var av = avplay();
             if (!av || !active) return;
-            if (av.getState() === 'PLAYING') av.pause(); else av.play();
+            if (av.getState() === 'PLAYING') {
+                av.pause();
+                notifyState('in pausa');
+            } else {
+                av.play();
+                notifyState('in riproduzione');
+            }
+        },
+        pause: function () {
+            var av = avplay();
+            if (av && active && av.getState() === 'PLAYING') {
+                av.pause();
+                notifyState('in pausa');
+            }
+        },
+        isPaused: function () {
+            var av = avplay();
+            try { return !av || !active || av.getState() !== 'PLAYING'; } catch (e) { return true; }
+        },
+        durationMs: function () {
+            var av = avplay();
+            try { return av && active ? av.getDuration() : 0; } catch (e) { return 0; }
         },
         seekBy: function (seconds) {
             var av = avplay();

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=1920, height=1080, user-scalable=no">
-    <title>Proscaenia Prova</title>
+    <title>Proscaenia</title>
     <link rel="stylesheet" href="css/style.css">
     <!-- API Samsung (AVPlay, ProductInfo): il runtime della TV risolve $WEBAPIS; altrove il caricamento fallisce senza conseguenze. -->
     <script src="$WEBAPIS/webapis/webapis.js"></script>
@@ -14,62 +14,131 @@
     <!-- Elemento video usato da Shaka Player (EME/MSE). -->
     <video id="video" playsinline></video>
 
+    <!--
+      Struttura e terminologia ricalcano l'app Android TV: login di primo avvio, catalogo a righe,
+      scheda in due colonne con "Riproduci", player con OSD, barra "In riproduzione" con Stop.
+      La diagnostica della prova tecnica resta raggiungibile dal catalogo e dal login.
+    -->
     <div id="ui">
-        <section id="panel">
-            <h1>Proscaenia · prova Tizen</h1>
-            <p id="status" class="status">Pronto</p>
-
-            <h2>1. Diagnostica</h2>
-            <button class="focusable" data-action="env">Ambiente ed EME</button>
-            <button class="focusable" data-action="cors">Test API (CORS)</button>
-
-            <h2>2. Accesso</h2>
-            <input class="focusable" id="email" type="email" placeholder="Email" autocomplete="off">
-            <input class="focusable" id="password" type="password" placeholder="Password" autocomplete="off">
-            <button class="focusable" data-action="login">Accedi</button>
-
-            <h2>3. Spettacolo</h2>
-            <button class="focusable" data-action="shows">Carica spettacoli</button>
-            <div id="show-list"></div>
-            <p id="selected-show" class="hint">Nessuno spettacolo selezionato</p>
-
-            <h2>4. Riproduzione</h2>
-            <div class="row">
-                <button class="focusable" data-action="play" data-engine="shaka" data-drm="widevine">Shaka · Widevine</button>
-                <button class="focusable" data-action="play" data-engine="shaka" data-drm="playready">Shaka · PlayReady</button>
+        <section id="screen-login" class="screen">
+            <div class="login-box">
+                <h1 class="brand">Accedi a Proscaenia</h1>
+                <p class="muted">Inserisci i dati del tuo abbonamento una sola volta: vengono verificati con la piattaforma e salvati su questa TV.</p>
+                <input class="focusable field" id="email" type="email" placeholder="Username" autocomplete="off">
+                <input class="focusable field" id="password" type="password" placeholder="Password" autocomplete="off">
+                <button class="focusable btn btn-primary btn-wide" data-action="login">Accedi</button>
+                <p id="login-message" class="message"></p>
+                <button class="focusable btn btn-outlined" data-action="open-diag">Diagnostica</button>
             </div>
-            <div class="row">
-                <button class="focusable" data-action="play" data-engine="avplay" data-drm="playready">AVPlay · PlayReady</button>
-                <button class="focusable" data-action="play" data-engine="avplay" data-drm="widevine">AVPlay · Widevine</button>
-            </div>
-
-            <h2>5. Log</h2>
-            <input class="focusable" id="log-server" type="text" placeholder="Ricevitore PC, es. http://192.168.1.10:8765" autocomplete="off">
-            <button class="focusable" data-action="log-server">Attiva invio al PC</button>
-            <div class="row">
-                <button class="focusable" data-action="export-usb">Esporta ZIP (USB)</button>
-                <button class="focusable" data-action="export-pc">Invia ZIP al PC</button>
-            </div>
-            <button class="focusable" data-action="export-share">Condividi ZIP</button>
-
-            <h2>6. Uscita</h2>
-            <button class="focusable danger" data-action="release">Libera posto dispositivo ed esci</button>
         </section>
-        <section id="log-panel">
-            <pre id="log"></pre>
+
+        <section id="screen-catalog" class="screen">
+            <header class="catalog-header">
+                <h1 class="brand">Proscaenia</h1>
+                <button class="focusable btn btn-text" data-action="open-diag">Diagnostica</button>
+            </header>
+            <div class="now-playing hidden"></div>
+            <div id="catalog-state" class="state"></div>
+            <div id="rows" class="rows"></div>
+        </section>
+
+        <section id="screen-detail" class="screen">
+            <div class="detail">
+                <div class="detail-image"><img id="detail-image" alt=""></div>
+                <div class="detail-info">
+                    <div class="now-playing hidden"></div>
+                    <h2 id="detail-title" class="detail-title"></h2>
+                    <p id="detail-meta" class="detail-meta"></p>
+                    <div class="button-row">
+                        <button class="focusable btn btn-primary" id="detail-play" data-action="play">&#9654;&nbsp; Riproduci</button>
+                    </div>
+                    <p id="detail-synopsis" class="detail-synopsis"></p>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-diag" class="screen">
+            <div class="diag">
+                <div class="diag-panel">
+                    <h1 class="brand">Diagnostica</h1>
+                    <p id="status" class="muted">Pronto</p>
+
+                    <h3>Ambiente</h3>
+                    <div class="button-row">
+                        <button class="focusable btn btn-outlined" data-action="env">Ambiente ed EME</button>
+                        <button class="focusable btn btn-outlined" data-action="cors">Test API (CORS)</button>
+                    </div>
+
+                    <h3>Player provato per primo (gli altri si tentano in automatico)</h3>
+                    <div class="button-row">
+                        <button class="focusable btn btn-outlined engine" data-action="engine" data-engine="shaka" data-drm="widevine">Shaka · Widevine</button>
+                        <button class="focusable btn btn-outlined engine" data-action="engine" data-engine="shaka" data-drm="playready">Shaka · PlayReady</button>
+                    </div>
+                    <div class="button-row">
+                        <button class="focusable btn btn-outlined engine" data-action="engine" data-engine="avplay" data-drm="playready">AVPlay · PlayReady</button>
+                        <button class="focusable btn btn-outlined engine" data-action="engine" data-engine="avplay" data-drm="widevine">AVPlay · Widevine</button>
+                    </div>
+
+                    <h3>Log</h3>
+                    <input class="focusable field" id="log-server" type="text" placeholder="Ricevitore PC, es. http://192.168.1.10:8765" autocomplete="off">
+                    <div class="button-row">
+                        <button class="focusable btn btn-outlined" data-action="log-server">Attiva invio al PC</button>
+                        <button class="focusable btn btn-outlined" data-action="export-usb">Esporta ZIP (USB)</button>
+                    </div>
+                    <div class="button-row">
+                        <button class="focusable btn btn-outlined" data-action="export-pc">Invia ZIP al PC</button>
+                        <button class="focusable btn btn-outlined" data-action="export-share">Condividi ZIP</button>
+                    </div>
+
+                    <h3>Account e uscita</h3>
+                    <div class="button-row">
+                        <button class="focusable btn btn-danger" data-action="release">Libera posto dispositivo ed esci</button>
+                    </div>
+                    <div class="button-row">
+                        <button class="focusable btn btn-outlined" data-action="forget-account">Cambia account (dimentica i dati di accesso)</button>
+                    </div>
+                </div>
+                <div class="diag-log"><pre id="log"></pre></div>
+            </div>
         </section>
     </div>
 
-    <div id="osd" class="hidden"></div>
+    <!-- Player: OSD e scheda d'errore, sopra il video. -->
+    <section id="screen-player" class="screen player-layer">
+        <div id="player-buffering" class="buffering hidden"><div class="spinner"></div></div>
+        <div id="player-error" class="error-card hidden">
+            <p id="player-error-text"></p>
+            <div class="button-row">
+                <button class="focusable btn btn-primary" data-action="player-retry">Riprova</button>
+                <button class="focusable btn btn-text" data-action="player-close">Chiudi</button>
+            </div>
+        </div>
+        <div id="osd" class="osd hidden">
+            <div id="osd-title" class="osd-title"></div>
+            <div class="osd-progress">
+                <span id="osd-position">0:00</span>
+                <div class="osd-track"><div id="osd-fill" class="osd-fill"></div></div>
+                <span id="osd-duration">--:--</span>
+            </div>
+            <div class="osd-buttons">
+                <button class="focusable osd-btn" data-action="osd-rewind">&#8634;&nbsp; Indietro 10 s</button>
+                <button class="focusable osd-btn" id="osd-playpause" data-action="osd-playpause">&#10074;&#10074;&nbsp; Pausa</button>
+                <button class="focusable osd-btn" data-action="osd-stop">&#9632;&nbsp; Stop</button>
+                <button class="focusable osd-btn" data-action="osd-forward">Avanti 10 s &nbsp;&#8635;</button>
+            </div>
+        </div>
+    </section>
 
     <script src="lib/shaka-player.compiled.js"></script>
     <script src="lib/jszip.min.js"></script>
     <script src="js/log.js"></script>
+    <script src="js/secure-store.js"></script>
     <script src="js/api.js"></script>
     <script src="js/diagnostics.js"></script>
     <script src="js/player-shaka.js"></script>
     <script src="js/player-avplay.js"></script>
     <script src="js/export.js"></script>
+    <script src="js/nav.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

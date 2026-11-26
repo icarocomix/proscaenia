@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.icarocomix.proscaenia.R
+import com.icarocomix.proscaenia.ui.tv.tvFocusHighlight
 import com.icarocomix.proscaenia.ui.common.asString
 
 @Composable
@@ -130,7 +132,9 @@ fun LoginScreen(
             Button(
                 onClick = viewModel::submit,
                 enabled = state.canSubmit,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .tvFocusHighlight(ButtonDefaults.shape, focusedScale = 1.02f),
             ) {
                 if (state.isSubmitting) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)

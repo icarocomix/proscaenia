@@ -1,11 +1,23 @@
-/* Layout fisso 1920x1080: la TV non ridimensiona la finestra, quindi niente media query. */
+/*
+ * Layout fisso 1920x1080: la TV non ridimensiona la finestra, quindi niente media query.
+ *
+ * Parità con l'app Android TV: lì il canvas è di 960 dp, qui di 1920 px, quindi ogni misura Android
+ * in dp (o sp) vale il doppio in px. Colori, forme e caratteri ricalcano il tema "sala teatrale"
+ * (fondo quasi nero, rosso sipario, oro delle luci di ribalta, titoli con grazie).
+ *
+ * Vincoli di Chromium 63 (Tizen 5.0): niente "gap" sui flex, niente variabili CSS dentro calc
+ * complessi, niente aspect-ratio. Uso margini e padding espliciti.
+ */
 :root {
-    --bg: #14100f;
-    --panel: #221a18;
-    --text: #f1e9e4;
-    --muted: #a89a92;
-    --accent: #c9a227;
-    --danger: #b3412f;
+    --bg: #0f0b0c;           /* StageBlack */
+    --surface: #1b1416;      /* StageSurface */
+    --surface-high: #261c1f; /* StageSurfaceHigh */
+    --primary: #b8283c;      /* CurtainRed */
+    --primary-dark: #5c0f1b; /* CurtainRedDark */
+    --gold: #d9b26f;         /* FootlightGold */
+    --text: #f3eae0;         /* Ivory */
+    --muted: #bfb2a8;        /* Muted */
+    --error: #ffb4ab;
 }
 
 html, body {
@@ -16,12 +28,14 @@ html, body {
     background: var(--bg);
     color: var(--text);
     font-family: "SamsungOne", "Tizen Sans", sans-serif;
-    font-size: 22px;
+    font-size: 32px;
 }
 
-/* Durante la riproduzione con AVPlay il video sta sotto la pagina: tutto deve diventare trasparente. */
-body.playing-avplay, body.playing-avplay #ui { background: transparent; }
-body.playing #ui { display: none; }
+h1, h2, .brand, .detail-title, .osd-title { font-family: Georgia, "Times New Roman", serif; font-weight: normal; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+
+/* ------------------------------------------------------------------ piani video */
 
 #av-player, #video {
     position: absolute;
@@ -31,79 +45,261 @@ body.playing #ui { display: none; }
     height: 1080px;
     display: none;
 }
-body.playing-avplay #av-player { display: block; }
-body.playing-shaka #video { display: block; background: #000; }
+body.engine-avplay #av-player { display: block; }
+body.engine-shaka #video { display: block; background: #000; }
+
+/*
+ * Con il player in primo piano l'interfaccia di navigazione scompare e, con AVPlay, la pagina deve
+ * diventare trasparente perché il video è disegnato sotto l'HTML. Con l'audio in sottofondo invece
+ * l'interfaccia è opaca e copre il video, che continua a scorrere.
+ */
+body.player-visible { background: transparent; }
+body.player-visible #ui { display: none; }
+body:not(.player-visible) #video { visibility: hidden; }
 
 #ui {
-    display: flex;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
     height: 1080px;
     background: var(--bg);
 }
 
-#panel {
-    width: 760px;
-    padding: 24px 32px;
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ------------------------------------------------------------------ pulsanti e focus */
+
+/*
+ * Focus da telecomando: bordo oro di 6 px (3 dp) e leggero ingrandimento, come su Android TV.
+ * Il bordo trasparente è sempre presente per non spostare il layout quando arriva il focus.
+ */
+.focusable { outline: none; border: 6px solid transparent; transition: transform 120ms ease-out; }
+.focusable:focus { border-color: var(--gold); transform: scale(1.06); }
+
+.btn {
+    display: inline-block;
     box-sizing: border-box;
-    overflow-y: auto;
-    background: var(--panel);
+    height: 92px;
+    padding: 0 48px;
+    margin: 0 24px 0 0;
+    border-radius: 46px;
+    font-size: 28px;
+    font-family: inherit;
+    color: var(--text);
+    background: transparent;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.btn-primary { background: var(--primary); }
+.btn-outlined { box-shadow: inset 0 0 0 2px var(--muted); }
+.btn-text { color: var(--gold); }
+.btn-danger { background: var(--primary-dark); }
+.btn-wide { display: block; width: 100%; margin: 24px 0; }
+.btn.selected { background: var(--surface-high); box-shadow: inset 0 0 0 2px var(--gold); color: var(--gold); }
+.btn:focus { transform: scale(1.04); }
+
+.button-row { margin: 12px 0; white-space: nowrap; }
+
+.field {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    height: 112px;
+    margin: 16px 0;
+    padding: 0 32px;
+    font-size: 32px;
+    color: var(--text);
+    background: var(--surface);
+    border-radius: 8px;
+    border: 6px solid var(--surface-high);
+}
+.field:focus { transform: none; border-color: var(--gold); }
+
+.message { min-height: 40px; color: var(--error); font-size: 28px; }
+
+/* ------------------------------------------------------------------ login */
+
+.login-box { width: 1000px; margin: 108px auto 0; }
+.login-box .brand { color: var(--gold); font-size: 56px; margin: 0 0 16px; }
+
+/* ------------------------------------------------------------------ catalogo */
+
+/* Margini di overscan: 96 px ai lati, 54 px in alto e in basso (48/27 dp su Android). */
+.catalog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 54px 96px 0;
+}
+.catalog-header .brand { margin: 0; color: var(--gold); font-size: 48px; }
+.catalog-header .btn { height: 72px; padding: 0 32px; margin: 0; }
+
+#screen-catalog .now-playing { margin: 20px 96px 0; }
+
+.state { padding: 54px 96px; color: var(--muted); }
+/* Senza messaggi il contenitore di stato non deve occupare spazio sopra le righe. */
+.state:empty { display: none; }
+
+.rows {
+    height: 860px;
+    overflow: hidden;
+    padding-bottom: 54px;
+}
+.row-title { margin: 28px 96px 12px; font-size: 32px; font-weight: normal; }
+.row-scroll {
+    white-space: nowrap;
+    overflow: hidden;
+    /* Spazio per l'ingrandimento della scheda con il focus, che altrimenti verrebbe tagliato. */
+    padding: 12px 96px;
 }
 
-#log-panel {
-    flex: 1;
+.card {
+    display: inline-block;
+    vertical-align: top;
+    width: 336px;
+    margin-right: 28px;
+    padding: 0;
+    border-radius: 24px;
+    background: var(--surface-high);
+    color: var(--text);
+    text-align: left;
+    font-family: inherit;
+    white-space: normal;
+    overflow: hidden;
+}
+.card-image { width: 336px; height: 189px; background: var(--surface); }
+.card-image img { width: 336px; height: 189px; object-fit: cover; display: block; }
+/* Un'immagine senza sorgente (non ancora caricata o assente) mostrerebbe il bordo di "immagine rotta". */
+.card-image img:not([src]), .detail-image img:not([src]) { visibility: hidden; }
+.detail-image { background: var(--surface); border-radius: 24px; height: 410px; }
+.card-title {
     padding: 24px;
+    height: 72px;
+    font-size: 28px;
+    line-height: 36px;
     overflow: hidden;
 }
 
+/* ------------------------------------------------------------------ barra "In riproduzione" */
+
+.now-playing {
+    display: flex;
+    align-items: center;
+    padding: 20px 32px;
+    border-radius: 24px;
+    background: var(--surface-high);
+}
+.now-playing .np-text { flex: 1; min-width: 0; }
+.now-playing .np-label { color: var(--gold); font-size: 24px; }
+.now-playing .np-title { font-size: 32px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.now-playing .btn { height: 80px; padding: 0 32px; margin: 0 0 0 24px; }
+
+/* ------------------------------------------------------------------ scheda */
+
+.detail { display: flex; padding: 54px 96px; height: 972px; box-sizing: border-box; }
+.detail-image { width: 728px; margin-right: 64px; }
+.detail-image img { width: 728px; height: 410px; object-fit: cover; border-radius: 24px; background: var(--surface); display: block; }
+.detail-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.detail-info .now-playing { margin-bottom: 24px; }
+.detail-title { font-size: 56px; margin: 0 0 16px; line-height: 1.2; max-height: 136px; overflow: hidden; }
+.detail-meta { color: var(--gold); font-size: 28px; margin: 0 0 16px; }
+.detail-synopsis { font-size: 32px; line-height: 1.45; margin: 24px 0 0; overflow: hidden; flex: 1; }
+
+/* ------------------------------------------------------------------ diagnostica */
+
+.diag { display: flex; height: 1080px; }
+.diag-panel {
+    width: 980px;
+    padding: 54px 48px 54px 96px;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: var(--surface);
+}
+.diag-panel .brand { color: var(--gold); font-size: 48px; margin: 0 0 8px; }
+.diag-panel h3 { font-size: 24px; margin: 28px 0 4px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; font-weight: normal; }
+.diag-panel .btn { height: 76px; padding: 0 28px; font-size: 24px; }
+.diag-panel .field { height: 84px; font-size: 26px; }
+.diag-log { flex: 1; padding: 54px 96px 54px 32px; overflow: hidden; }
 #log {
     margin: 0;
-    height: 1032px;
+    height: 972px;
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-all;
     font-family: monospace;
-    font-size: 17px;
+    font-size: 18px;
     line-height: 1.35;
 }
 #log .w { color: #e8b04a; }
 #log .e { color: #ff7a66; }
 
-h1 { font-size: 30px; margin: 0 0 8px; color: var(--accent); }
-h2 { font-size: 20px; margin: 18px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+/* ------------------------------------------------------------------ player */
 
-.status { margin: 0; color: var(--muted); }
-.hint { margin: 6px 0 0; color: var(--muted); font-size: 18px; }
-/* Niente "gap" sui flex: Chromium 63 (Tizen 5.0) non lo supporta. */
-.row { display: flex; }
-.row .focusable { flex: 1; }
-.row .focusable + .focusable { margin-left: 10px; }
-
-.focusable {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    margin: 6px 0;
-    padding: 10px 14px;
-    font-size: 20px;
-    color: var(--text);
-    background: #3a2e2a;
-    border: 3px solid transparent;
-    border-radius: 8px;
-    text-align: left;
-}
-.focusable:focus { outline: none; border-color: var(--accent); background: #4d3c36; }
-.focusable.danger { background: #5a2a22; }
-.focusable.selected { border-left: 10px solid var(--accent); }
-
-#show-list { max-height: 260px; overflow-y: auto; }
-
-#osd {
+.player-layer {
     position: absolute;
-    left: 40px;
-    bottom: 40px;
-    padding: 12px 18px;
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.7);
-    font-size: 22px;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
     z-index: 10;
 }
-.hidden { display: none; }
+
+.osd {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Overscan: 96 px ai lati, 54 px in basso. */
+    padding: 96px 96px 54px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.88));
+}
+.osd-title { font-size: 44px; margin-bottom: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.osd-progress { display: flex; align-items: center; font-size: 28px; margin-bottom: 24px; }
+.osd-track { flex: 1; height: 12px; margin: 0 24px; border-radius: 6px; background: rgba(255, 255, 255, 0.25); overflow: hidden; }
+.osd-fill { height: 12px; width: 0; background: var(--gold); }
+.osd-buttons { white-space: nowrap; }
+
+/* Pulsanti OSD: con il focus si invertono (fondo chiaro, testo scuro), come su Android TV. */
+.osd-btn {
+    display: inline-block;
+    height: 84px;
+    padding: 0 28px;
+    margin-right: 20px;
+    border-radius: 48px;
+    font-size: 28px;
+    font-family: inherit;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.14);
+    border-color: transparent;
+}
+.osd-btn:focus { background: #fff; color: #000; border-color: #fff; transform: scale(1.1); }
+/* Larghezza fissa: passando da "Pausa" a "Play" la riga dei pulsanti non deve spostarsi. */
+#osd-playpause { min-width: 220px; }
+
+.error-card {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 840px;
+    margin-left: -420px;
+    margin-top: -180px;
+    padding: 40px;
+    box-sizing: border-box;
+    border-radius: 24px;
+    background: var(--surface-high);
+    font-size: 32px;
+}
+
+.buffering { position: absolute; left: 50%; top: 50%; margin: -48px 0 0 -48px; }
+.spinner {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    border: 8px solid rgba(255, 255, 255, 0.2);
+    border-top-color: var(--gold);
+    box-sizing: border-box;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

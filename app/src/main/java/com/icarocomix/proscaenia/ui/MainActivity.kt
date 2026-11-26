@@ -3,14 +3,21 @@ package com.icarocomix.proscaenia.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.icarocomix.proscaenia.ProscaeniaApp
+import com.icarocomix.proscaenia.core.device.DeviceForm
 import com.icarocomix.proscaenia.ui.navigation.AppNavHost
 import com.icarocomix.proscaenia.ui.navigation.Routes
 import com.icarocomix.proscaenia.ui.theme.ProscaeniaTheme
+import com.icarocomix.proscaenia.ui.tv.TvAwareContent
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * Unica activity dell'app, ospite della navigazione Compose.
@@ -38,13 +45,37 @@ class MainActivity : AppCompatActivity() {
         // ripristinata dallo stato salvato: rielaborarlo riaprirebbe il player una seconda volta.
         if (savedInstanceState == null) handleIntent(intent)
 
+        val isTv = DeviceForm.isTelevision(this)
         setContent {
             ProscaeniaTheme {
-                AppNavHost(
-                    startDestination = startDestination,
-                    playerRequests = playerRequests,
-                    onPlayerRequestHandled = { playerRequests.value = null },
-                )
+                TvAwareContent(isTv = isTv) {
+                    AppNavHost(
+                        startDestination = startDestination,
+                        playerRequests = playerRequests,
+                        onPlayerRequestHandled = { playerRequests.value = null },
+                    )
+                }
+            }
+        }
+        if (isTv) keepScreenOnWhilePlayingOnTv()
+    }
+
+    /**
+     * Sulla TV l'audio può proseguire mentre si sfoglia il catalogo, ma il salvaschermo porterebbe
+     * l'activity in onStop e con essa l'arresto della riproduzione: tengo quindi lo schermo acceso
+     * finché uno spettacolo sta effettivamente suonando, come fa già la PlayerView nel player.
+     */
+    private fun keepScreenOnWhilePlayingOnTv() {
+        val status = (application as ProscaeniaApp).container.playbackStatus
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                status.nowPlaying.collect { nowPlaying ->
+                    if (nowPlaying?.isPlaying == true) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    } else {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                }
             }
         }
     }

@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Prova tecnica Proscaenia per Samsung Smart TV (Tizen 5.0, UE43RU7400).
-  App web impacchettata (.wgt): non sostituisce né modifica l'app Android, serve solo a verificare
-  sulla TV reale CORS, login, licenze DRM e riproduzione prima di scrivere un client completo.
+  Client Proscaenia per Samsung Smart TV (Tizen 5.0, UE43RU7400), ancora in fase di prova tecnica.
+  App web impacchettata (.wgt) con interfaccia allineata all'app Android TV (catalogo, scheda, player
+  con OSD); la schermata Diagnostica conserva le verifiche di CORS, login, licenze DRM e riproduzione.
+  Non sostituisce né modifica l'app Android.
 -->
 <widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets"
-        id="http://icarocomix.com/proscaenia-tizen-prova" version="0.1.0" viewmodes="maximized">
+        id="http://icarocomix.com/proscaenia-tizen-prova" version="0.2.0" viewmodes="maximized">
     <tizen:application id="PrScTizen0.ProscaeniaProva" package="PrScTizen0" required_version="2.3"/>
     <tizen:profile name="tv-samsung"/>
     <content src="index.html"/>
     <icon src="icon.png"/>
-    <name>Proscaenia Prova</name>
-    <description>Prova tecnica: CORS, login, DRM Widevine/PlayReady, riproduzione DASH.</description>
+    <name>Proscaenia</name>
+    <description>Catalogo e riproduzione Proscaenia; diagnostica CORS, DRM Widevine/PlayReady e log.</description>
 
     <feature name="http://tizen.org/feature/screen.size.all"/>
 
