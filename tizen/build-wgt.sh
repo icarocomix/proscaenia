@@ -1,38 +1,59 @@
 #!/usr/bin/env bash
-# Pacchetto e installazione della prova tecnica Proscaenia su Samsung TV (Tizen).
+# PASSO 4 — Pacchetto e installazione della prova tecnica Proscaenia su Samsung TV (Tizen).
 #
 # Uso:
 #   ./build-wgt.sh                        # crea solo il pacchetto firmato .wgt
 #   ./build-wgt.sh --tv 192.168.1.50      # crea, installa e avvia sulla TV (Developer Mode attiva)
+#   ./build-wgt.sh --tv                   # come sopra, con l'IP salvato da tv-connetti.sh
 #   ./build-wgt.sh --profile mioProfilo   # profilo di firma del Certificate Manager (default: proscaenia)
 #
-# Prerequisiti (vedi README.md): Tizen Studio con estensione TV, profilo di certificato Samsung
-# creato nel Certificate Manager con il DUID della TV, Developer Mode attiva sulla TV.
+# Prerequisiti (vedi README.md): ./tv-connetti.sh <IP TV> e ./certificato-samsung.sh eseguiti.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/tv-comune.sh"
+
 APP_ID="PrScTizen0.ProscaeniaProva"
 PROFILE="proscaenia"
 TV_IP=""
-TIZEN_HOME="${TIZEN_HOME:-$HOME/tizen-studio}"
+INSTALLA=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --tv) TV_IP="$2"; shift 2 ;;
+        --tv)
+            INSTALLA=1
+            # L'IP è facoltativo: senza, uso quello salvato da tv-connetti.sh.
+            if [[ $# -ge 2 && "$2" != --* ]]; then TV_IP="$2"; shift 2; else shift; fi ;;
         --profile) PROFILE="$2"; shift 2 ;;
-        -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
         *) echo "Opzione sconosciuta: $1" >&2; exit 2 ;;
     esac
 done
+if [[ "$INSTALLA" == 1 && -z "$TV_IP" ]]; then
+    TV_IP="$(cat "$TV_STATO_DIR/ip" 2>/dev/null || true)"
+    if [[ -z "$TV_IP" ]]; then
+        errore "IP della TV non indicato e non salvato: ./build-wgt.sh --tv <IP TV> (o prima ./tv-connetti.sh)."
+        exit 2
+    fi
+fi
 
-TIZEN="$TIZEN_HOME/tools/ide/bin/tizen"
-SDB="$TIZEN_HOME/tools/sdb"
-for tool in "$TIZEN" "$SDB"; do
-    if [[ ! -x "$tool" ]]; then
-        echo "Strumento non trovato: $tool (impostare TIZEN_HOME sulla cartella di Tizen Studio)" >&2
+richiedi_strumenti_tizen
+
+# Controllo il profilo prima di impacchettare: un profilo Tizen generico produce un pacchetto
+# che la TV rifiuta solo a installazione in corso, con un messaggio poco chiaro.
+INFO="$(info_profilo "$PROFILE")"
+if [[ "$(campo esiste "$INFO")" != "si" ]]; then
+    errore "Profilo di firma \"$PROFILE\" inesistente: eseguire ./certificato-samsung.sh"
+    exit 1
+fi
+TIPO="$(campo tipo "$INFO")"
+if [[ "$TIPO" != "samsung" ]]; then
+    if [[ "$INSTALLA" == 1 ]]; then
+        errore "Il profilo \"$PROFILE\" è di tipo $TIPO: la TV rifiuterebbe il pacchetto. Eseguire ./certificato-samsung.sh"
         exit 1
     fi
-done
+    avviso "Profilo \"$PROFILE\" di tipo $TIPO: il pacchetto non sarà installabile su una TV Samsung."
+fi
 
 # Controllo leggero delle risorse: il PC è condiviso con altre sessioni e il CLI Tizen avvia una JVM.
 echo "== Risorse =="
@@ -52,18 +73,44 @@ cp "$WGT" "$SCRIPT_DIR"/
 WGT_OUT="$SCRIPT_DIR/$(basename "$WGT")"
 echo "Pacchetto creato: $WGT_OUT"
 
-if [[ -z "$TV_IP" ]]; then
+if [[ "$INSTALLA" != 1 ]]; then
     exit 0
 fi
 
+SERIALE="$TV_IP:$TV_PORTA_SDB"
 echo "== Installazione su $TV_IP =="
-"$SDB" connect "$TV_IP:26101"
-TARGET="$("$SDB" devices | awk -v ip="$TV_IP" '$1 ~ ip {print $3}' | head -n 1)"
-if [[ -z "$TARGET" ]]; then
-    echo "TV non collegata: verificare Developer Mode (IP del PC impostato) e riavvio della TV" >&2
+if [[ "$(stato_sdb "$SERIALE")" != "device" ]]; then
+    "$SDB" connect "$SERIALE" | tr -d '\r'
+    sleep 1
+fi
+TARGET="$(nome_target_sdb "$SERIALE")"
+if [[ "$(stato_sdb "$SERIALE")" != "device" || -z "$TARGET" ]]; then
+    errore "TV non collegata: eseguire ./tv-connetti.sh $TV_IP (indica cosa controllare sulla TV)."
     "$SDB" devices >&2
     exit 1
 fi
-"$TIZEN" install -n "$WGT_OUT" -t "$TARGET"
+
+# Il distributore Samsung vale solo per i DUID che contiene: verifico prima di installare.
+DEVPROF="$(dirname "$(campo distributore "$INFO")")/device-profile.xml"
+DUID="$(leggi_duid "$SERIALE")"
+if [[ -n "$DUID" && -f "$DEVPROF" ]] && ! grep -q -- "$DUID" "$DEVPROF"; then
+    errore "Il DUID della TV collegata ($DUID) non è nel certificato distributore del profilo \"$PROFILE\"."
+    echo "  Rieseguire ./tv-connetti.sh $TV_IP e ./certificato-samsung.sh" >&2
+    exit 1
+fi
+
+# Il CLI `tizen install` può terminare con codice 0 anche se la TV rifiuta il pacchetto: leggo
+# l'output per riconoscere l'esito e dare un'indicazione mirata.
+ESITO="$("$TIZEN" install -n "$WGT_OUT" -t "$TARGET" 2>&1 | tee /dev/stderr || true)"
+if grep -qiE "install failed|processing failed" <<<"$ESITO" \
+    || ! grep -qiE "successfully installed|Installed the package" <<<"$ESITO"; then
+    errore "Installazione non riuscita."
+    if grep -qiE "certificate|signature|author|distributor" <<<"$ESITO"; then
+        echo "  Problema di firma: rieseguire ./certificato-samsung.sh (profilo Samsung con il DUID della TV)." >&2
+    elif grep -qi "privilege" <<<"$ESITO"; then
+        echo "  Privilegio non consentito dal firmware: togliere da config.xml la riga indicata e ripetere." >&2
+    fi
+    exit 1
+fi
 "$TIZEN" run -p "$APP_ID" -t "$TARGET"
 echo "App avviata sulla TV ($TARGET)."

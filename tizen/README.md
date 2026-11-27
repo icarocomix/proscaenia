@@ -49,29 +49,78 @@ Sulla TV, nel campo "Ricevitore PC", va inserito `http://<IP del PC>:8765`, poi 
 e gli ZIP inviati vengono salvati in `tizen-log/`. Serve la porta 8765 aperta nel firewall del PC
 (su Fedora: `sudo firewall-cmd --add-port=8765/tcp`, temporaneo fino al riavvio).
 
-## Installazione sulla TV (una tantum)
+## Installazione sulla TV
 
-1. **Tizen Studio** (versione CLI o IDE) da developer.samsung.com/smarttv. Dal Package Manager vanno
-   installati *Samsung Certificate Extension* e *TV Extensions* (anche una versione 5.x va bene).
-2. **Developer Mode sulla TV**: App → digitare `1 2 3 4 5` con il telecomando → Developer mode **On**,
-   inserire l'IP del PC → riavviare la TV (spegnimento completo).
-3. **Certificato Samsung**: nel Certificate Manager va creato un profilo di tipo *Samsung* (TV)
-   chiamato `proscaenia`, accedendo con l'account Samsung (gratuito). Per il certificato di
-   distribuzione serve il **DUID della TV**: si legge collegando la TV da Device Manager
-   (`sdb connect <IP TV>:26101`), che lo propone in automatico.
-4. **Pacchetto, installazione e avvio**:
+Tizen Studio 6.1 CLI con *TV Extensions* e *Samsung Certificate Extension* è già installato in
+`~/tizen-studio`. Se si trova altrove, va impostato `TIZEN_HOME`. Tutti i comandi si lanciano dalla
+cartella `tizen/`. Ogni script controlla i propri prerequisiti, dice cosa manca e può essere
+rilanciato senza danni.
 
-   ```
-   cd tizen
-   ./build-wgt.sh --tv <IP della TV>
-   ```
+| Script | Passo | Cosa fa |
+|--------|-------|---------|
+| `tv-connetti.sh <IP TV>` | 2 | Verifica la rete e la porta di sviluppo, esegue `sdb connect`, legge e salva il DUID. |
+| `certificato-samsung.sh` | 3 | Controlla i prerequisiti, mette da parte un profilo Tizen con lo stesso nome, apre il Certificate Manager e verifica il risultato. |
+| `build-wgt.sh --tv` | 4 | Pacchetto firmato, controllo di profilo e DUID, installazione e avvio. |
 
-   Senza `--tv` crea solo il `.wgt`. Se Tizen Studio non è in `~/tizen-studio`, va impostato
-   `TIZEN_HOME`.
+### Perché serve un certificato Samsung
 
-Se l'installazione fallisce per un privilegio non consentito, si toglie da `config.xml` la riga del
-privilegio indicato nel messaggio d'errore (sono tutti di livello "public", ma alcuni firmware sono
-più restrittivi) e si ripete.
+Una TV Samsung in commercio installa solo pacchetti firmati da un **profilo Samsung**, formato da:
+
+- **certificato autore**: identifica chi firma, protetto da una password scelta al momento della
+  creazione;
+- **certificato distributore**: emesso da Samsung dopo il login con un account Samsung (gratuito) e
+  valido solo per le TV elencate per **DUID**, l'identificativo univoco dell'apparecchio.
+
+Per questo il DUID va letto dalla TV *prima* di creare il certificato, e la TV deve già essere in
+Developer Mode. Un profilo di tipo *Tizen* (generico) viene rifiutato dalla TV al momento
+dell'installazione.
+
+### Sequenza della prima installazione
+
+| # | Dove | Azione |
+|---|------|--------|
+| 1 | TV | Annotare l'IP della TV: Impostazioni → Generali → Rete → Stato rete → Impostazioni IP. |
+| 2 | PC | `./tv-connetti.sh <IP TV>`: la porta risulterà ancora chiusa, ma lo script stampa l'**IP del PC** da usare al passo 3. |
+| 3 | TV | Aprire **App** e digitare `1 2 3 4 5` col telecomando (tastierino numerico o a schermo). Impostare **Developer mode: On** e **Host PC IP** con l'IP del passo 2, poi OK. |
+| 4 | TV | Spegnimento **completo**: tenere premuto il tasto di accensione finché la TV si riavvia, oppure staccare la spina per 30 s, poi riaccendere. In alto compare la scritta "Developer Mode". |
+| 5 | PC | `./tv-connetti.sh <IP TV>`: deve finire con "DUID: …". IP e DUID vengono salvati in `tizen/.tv-locale/`, esclusa da git. |
+| 6 | PC | `./certificato-samsung.sh`, con la TV ancora accesa. Alla domanda sul vecchio profilo `proscaenia` di tipo Tizen rispondere **s**: viene rimosso dopo un backup di `profiles.xml`. Premere Invio per aprire il Certificate Manager. |
+| 7 | PC | Nel Certificate Manager seguire i clic elencati sotto, che lo script ripete a video. Il login Samsung avviene nel browser che si apre. Al termine chiudere il Certificate Manager: lo script verifica che il profilo sia Samsung e contenga il DUID. |
+| 8 | PC | `./build-wgt.sh --tv`: crea il pacchetto firmato, controlla che il DUID della TV sia nel certificato, installa e avvia l'app. Senza IP usa quello salvato. |
+| 9 | TV | Si apre l'app. Al primo avvio si inseriscono i dati di accesso. |
+
+Clic nel Certificate Manager (passo 7):
+
+1. **+** → tipo **Samsung** (non Tizen) → device type **TV** → nome profilo `proscaenia`, opzione
+   "Create a new certificate profile" → Next.
+2. **Author**: "Create a new author certificate" → nome a piacere, password a piacere (annotarla)
+   → login con l'account Samsung nel browser → Next.
+3. **Distributor**: "Create a new distributor certificate" → privilegio **Public** → nell'elenco
+   DUID deve comparire quello della TV, che lo script mostra a video. Se manca, aggiungerlo a mano.
+   Poi Next → **Finish**.
+4. Chiudere il Certificate Manager.
+
+### Installazioni successive
+
+Con la TV accesa basta `./build-wgt.sh --tv`. Senza `--tv` crea solo il `.wgt`. Se la TV non viene
+trovata, `./tv-connetti.sh` indica cosa controllare. Il caso tipico è un IP del PC cambiato dal
+router, da reimpostare nella Developer Mode: conviene riservare al PC un IP fisso nel router. La
+Developer Mode resta attiva finché non la si disattiva.
+
+### Possibili intoppi
+
+- **Porta 26101 chiusa** dopo l'attivazione: la TV non è stata spenta del tutto, oppure l'Host PC IP
+  non corrisponde all'IP attuale del PC.
+- **Login Samsung**: il Certificate Manager apre il browser predefinito e attende la risposta su
+  `localhost:4794`, porta che lo script verifica libera. Se la pagina conferma l'accesso ma il
+  Certificate Manager resta in attesa, premere di nuovo "Sign in".
+- **"Profilo di tipo tizen"** segnalato da `build-wgt.sh`: nel Certificate Manager era stato scelto
+  *Tizen* invece di *Samsung*. Rilanciare `./certificato-samsung.sh`.
+- **TV diversa o sostituita**: ripetere i passi 2–8, perché il certificato distributore va
+  rigenerato con il nuovo DUID.
+- **Privilegio non consentito** durante l'installazione: togliere da `config.xml` la riga del
+  privilegio indicato nel messaggio d'errore e ripetere il passo 8. Sono tutti privilegi di livello
+  "public", ma alcuni firmware sono più restrittivi.
 
 ## Uso con il telecomando
 
@@ -102,6 +151,8 @@ farli richiedere è **Cambia account** nella Diagnostica (doppia pressione di co
 ## Contenuto
 
 - `config.xml`, `index.html`, `icon.png`, `css/`: struttura dell'app.
+- `tv-connetti.sh`, `certificato-samsung.sh`, `build-wgt.sh`: installazione sulla TV (passi 2, 3 e 4);
+  `tv-comune.sh`: funzioni condivise dai tre script. Nessuno di questi entra nel `.wgt`.
 - `js/nav.js`: navigazione spaziale da telecomando; `js/app.js`: schermate, OSD e ciclo di vita.
 - `js/log.js`: log, sanificazione e invio al PC. `js/api.js`: contratto API e sessione (login
   automatico, rinnovo su 401, ritentativi). `js/secure-store.js`: custodia dei dati di accesso.

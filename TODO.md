@@ -91,9 +91,11 @@ Stato di avanzamento: riprendere dal primo punto non spuntato.
 - [ ] 51. Esecuzione sulla TV (a cura dell'utente) e lettura del log
       - [x] 51a. Installazione Tizen Studio 6.1 CLI in ~/tizen-studio (installer in ~/Scaricati/tizen-installer)
       - [x] 51b. Package Manager: TV Extensions + Samsung Certificate Extension
-      - [x] 51c. Certificato autore + profilo di firma `proscaenia`
-      - [ ] 51d. Developer Mode sulla TV (utente) e `sdb connect`
+      - [x] 51c. Certificato autore + profilo di firma `proscaenia` — **non valido per la TV**: è un profilo Tizen generico (distributore `tizen-distributor-signer`), senza DUID; va sostituito dal profilo Samsung (51f)
+      - [ ] 51d. Developer Mode sulla TV (utente) e `sdb connect` → `tizen/tv-connetti.sh <IP TV>` (legge e salva il DUID)
+      - [ ] 51f. Profilo di firma Samsung TV `proscaenia` (autore + distributore con il DUID) → `tizen/certificato-samsung.sh`
       - [ ] 51e. Pacchetto, installazione e avvio (`build-wgt.sh --tv`)
+
 
 ## Interfaccia TV: layout 10-foot, OSD player, audio in background, parità Tizen
 

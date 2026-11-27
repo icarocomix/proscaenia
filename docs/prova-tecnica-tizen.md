@@ -54,8 +54,36 @@ verso altre app o social quando la piattaforma la consente.
   tentativo sincrono.
 - Ricevitore Python sul PC (`tools/tizen_log_receiver.py`, solo libreria standard): righe di log in
   tempo reale e ZIP esportati.
-- Script `tizen/build-wgt.sh`: pacchetto firmato con il profilo del Certificate Manager, poi
-  facoltativamente installazione e avvio sulla TV via `sdb`.
+- Installazione in tre script, eseguiti in sequenza e rilanciabili senza effetti collaterali:
+  `tizen/tv-connetti.sh` collega la TV e ne legge il DUID, `tizen/certificato-samsung.sh` guida la
+  creazione del profilo di firma Samsung e `tizen/build-wgt.sh` crea il pacchetto, lo installa e
+  avvia l'app. Le funzioni comuni stanno in `tizen/tv-comune.sh`. IP e DUID della TV vengono salvati
+  in `tizen/.tv-locale/`, esclusa da git perché legata all'apparecchio. La sequenza con le azioni
+  da fare sulla TV è in `tizen/README.md`.
+
+### Firma e installazione sulla TV
+
+- **Serve un profilo Samsung, non Tizen.** Una TV Samsung in commercio accetta solo pacchetti
+  firmati da un certificato distributore Samsung che elenca il DUID dell'apparecchio. Il profilo
+  Tizen generico usa il distributore pubblico `tizen-distributor-signer` e viene rifiutato. Per
+  questo il DUID va letto prima di creare il certificato, con la Developer Mode già attiva.
+- **Creazione del profilo con il Certificate Manager grafico, guidata da uno script.** La creazione
+  da riga di comando (`tizen certificate`/`security-profiles`) produce solo profili Tizen e non può
+  ottenere il distributore Samsung, che richiede il login con l'account Samsung. Lo script controlla
+  i prerequisiti, mostra i clic da fare e alla chiusura verifica il risultato: tipo del profilo,
+  file dei certificati, presenza del DUID in `device-profile.xml`.
+- **Profilo omonimo preesistente rimosso solo da `profiles.xml`, con conferma e backup.** Il
+  Certificate Manager non accetta un nome già usato e `build-wgt.sh` usa per default `proscaenia`.
+  I file dei certificati vecchi restano dove sono. Alternativa scartata: un profilo con un altro
+  nome, che avrebbe obbligato a passare `--profile` a ogni installazione.
+- **Lettura del DUID con la stessa sequenza del Certificate Manager** (libreria sdblib): campo `duid`
+  di `sdb capability`, poi `shell 0 getduid`, `shell 0 getduidgadget` e `/opt/etc/duid-gadget`.
+  Se nessuno risponde, il DUID si legge sulla TV in Impostazioni → Supporto → Informazioni su questa
+  TV.
+- **Controlli preventivi in `build-wgt.sh`.** Con `--tv` lo script si ferma prima di impacchettare
+  se il profilo non è Samsung, e prima di installare se il DUID della TV collegata non è nel
+  certificato. L'esito di `tizen install` si ricava dall'output, perché il CLI può terminare con
+  codice 0 anche su rifiuto della TV.
 
 ## 4. Scoperte durante lo sviluppo
 
@@ -67,6 +95,15 @@ verso altre app o social quando la piattaforma la consente.
   principale, il controllo di `Origin` lato server, si ridimensiona. Va comunque confermato sul
   runtime della TV, che ha regole di accesso proprie.
 - Chromium 63 non supporta la proprietà `gap` nei contenitori flex: sostituita con margini.
+- Ambiente di firma (Tizen Studio 6.1 su Fedora): il profilo `proscaenia` creato inizialmente
+  era Tizen generico, quindi non installabile sulla TV. La Samsung Certificate Extension
+  (`cert-add-on` 2.0.75) è presente sia nell'IDE sia nel Certificate Manager autonomo.
+- Il login Samsung del Certificate Manager non dipende dal browser incorporato di SWT (2017), che
+  richiederebbe WebKitGTK 4.0, assente su Fedora recenti. Apre il browser di sistema
+  (`Desktop.browse` o `xdg-open`) e riceve il token su `http://localhost:4794/signin/callback`. Serve
+  quindi la porta locale 4794 libera.
+- Il Certificate Manager (SWT GTK3 del 2017, JDK 8 incorporato) si avvia sotto Wayland via XWayland
+  (`GDK_BACKEND=x11`), con soli avvisi GTK innocui.
 
 ## 5. Riepilogo
 
@@ -86,8 +123,11 @@ Verifiche eseguite:
 
 Non verificato:
 
-- esecuzione sulla TV reale: richiede Tizen Studio, il certificato Samsung con il DUID della TV e la
-  Developer Mode.
+- esecuzione sulla TV reale: Tizen Studio è pronto, mentre Developer Mode, profilo Samsung con il
+  DUID e installazione sono da eseguire seguendo la sequenza di `tizen/README.md`. Degli script di
+  installazione sono stati provati i controlli e i percorsi d'errore che non richiedono la TV: TV
+  irraggiungibile, profilo Tizen rifiutato, rimozione del profilo su una copia di `profiles.xml`,
+  prerequisiti del Certificate Manager e suo avvio.
 
 Limiti noti:
 
@@ -104,6 +144,7 @@ File toccati:
   `tizen/js/player-avplay.js`, `tizen/js/export.js`, `tizen/js/app.js`
 - `tizen/lib/shaka-player.compiled.js`, `tizen/lib/SHAKA-LICENSE.txt`, `tizen/lib/jszip.min.js`,
   `tizen/lib/JSZIP-LICENSE.markdown`
-- `tizen/build-wgt.sh`, `tizen/README.md`
+- `tizen/build-wgt.sh`, `tizen/tv-connetti.sh`, `tizen/certificato-samsung.sh`, `tizen/tv-comune.sh`,
+  `tizen/README.md`
 - `tools/tizen_log_receiver.py`
 - `.gitignore`, `TODO.md`
