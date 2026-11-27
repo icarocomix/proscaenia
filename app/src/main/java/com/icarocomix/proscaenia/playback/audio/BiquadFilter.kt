@@ -79,6 +79,56 @@ class BiquadFilter private constructor(
             )
         }
 
+        /** Q che dà allo scaffale la transizione più dolce senza sovraelongazioni (pendenza S = 1). */
+        const val SHELF_Q = 0.7071067811865476
+
+        /** Scaffale basso: modifica di [gainDb] tutto ciò che sta sotto [frequencyHz]. */
+        fun lowShelf(sampleRate: Int, frequencyHz: Double, q: Double, gainDb: Double, channelCount: Int): BiquadFilter =
+            shelf(sampleRate, frequencyHz, q, gainDb, channelCount, high = false)
+
+        /** Scaffale alto: modifica di [gainDb] tutto ciò che sta sopra [frequencyHz]. */
+        fun highShelf(sampleRate: Int, frequencyHz: Double, q: Double, gainDb: Double, channelCount: Int): BiquadFilter =
+            shelf(sampleRate, frequencyHz, q, gainDb, channelCount, high = true)
+
+        private fun shelf(
+            sampleRate: Int,
+            frequencyHz: Double,
+            q: Double,
+            gainDb: Double,
+            channelCount: Int,
+            high: Boolean,
+        ): BiquadFilter {
+            val w0 = 2 * PI * safeFrequency(frequencyHz, sampleRate) / sampleRate
+            val amplitude = sqrt(10.0.pow(gainDb / 20.0))
+            val alpha = sin(w0) / (2 * q)
+            val cosW0 = cos(w0)
+            val twoSqrtAAlpha = 2 * sqrt(amplitude) * alpha
+            // Le due varianti del Cookbook differiscono solo per il segno dei termini in (A-1)·cos(w0):
+            // le scrivo per esteso per restare confrontabili riga per riga con le formule di riferimento.
+            val b0: Double
+            val b1: Double
+            val b2: Double
+            val a0: Double
+            val a1: Double
+            val a2: Double
+            if (high) {
+                b0 = amplitude * ((amplitude + 1) + (amplitude - 1) * cosW0 + twoSqrtAAlpha)
+                b1 = -2 * amplitude * ((amplitude - 1) + (amplitude + 1) * cosW0)
+                b2 = amplitude * ((amplitude + 1) + (amplitude - 1) * cosW0 - twoSqrtAAlpha)
+                a0 = (amplitude + 1) - (amplitude - 1) * cosW0 + twoSqrtAAlpha
+                a1 = 2 * ((amplitude - 1) - (amplitude + 1) * cosW0)
+                a2 = (amplitude + 1) - (amplitude - 1) * cosW0 - twoSqrtAAlpha
+            } else {
+                b0 = amplitude * ((amplitude + 1) - (amplitude - 1) * cosW0 + twoSqrtAAlpha)
+                b1 = 2 * amplitude * ((amplitude - 1) - (amplitude + 1) * cosW0)
+                b2 = amplitude * ((amplitude + 1) - (amplitude - 1) * cosW0 - twoSqrtAAlpha)
+                a0 = (amplitude + 1) + (amplitude - 1) * cosW0 + twoSqrtAAlpha
+                a1 = -2 * ((amplitude - 1) + (amplitude + 1) * cosW0)
+                a2 = (amplitude + 1) + (amplitude - 1) * cosW0 - twoSqrtAAlpha
+            }
+            return BiquadFilter(b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0, channelCount)
+        }
+
         /**
          * Limito la frequenza sotto Nyquist: con flussi a frequenza di campionamento molto bassa (per
          * esempio 8 kHz) i 3 kHz del secondo filtro sarebbero troppo vicini al limite e il filtro

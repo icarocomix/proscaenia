@@ -72,11 +72,12 @@ Riproduzione:
 
 - Buffer in RAM: minimo 15 s, massimo 40 s, avvio con 1,5 s, ripartenza con 3 s; nessuna cache su
   disco.
-- "Amplifica voce": passa-alto Butterworth del 4° ordine a 100 Hz (due biquad, Q 0,541 e 1,307),
-  due peaking a 1,3 e 3 kHz (Q 1, +4,5 dB), compressore a canali collegati (−20 dBFS, 3:1, 5/150 ms,
-  +3 dB) con smussamento della riduzione nel dominio logaritmico, limitatore tanh sopra 0,8,
-  dissolvenza di 30 ms. Processore sempre presente nella catena del `DefaultAudioSink` (prima di
-  Sonic); a effetto spento i byte vengono copiati senza conversione.
+- "Amplifica voce": catena descritta per intero in `docs/audio-amplifica-voce.md` (attenuazione dei
+  lati in stereo, riduzione adattativa del rumore, equalizzazione per le consonanti, livellatore
+  lento, compressore morbido, limitatori). Sostituisce la prima versione (passa-alto 100 Hz, campane
+  a 1,3 e 3 kHz, compressore veloce con compensazione fissa), che sulle registrazioni reali alzava
+  anche il rumore delle pause. Processore sempre presente nella catena del `DefaultAudioSink` (prima
+  di Sonic); a effetto spento i byte vengono copiati senza conversione.
 - URL scaduto (403/410): nuova risoluzione e ripartenza dalla stessa posizione e stato play/pausa,
   al massimo 2 tentativi consecutivi (contatore azzerato a ogni READY).
 - Posizione: salvata ogni 10 s, a ogni arresto, al cambio spettacolo, a rimozione del task e alla
